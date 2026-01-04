@@ -8,7 +8,7 @@ import {
   ViewStyle,
   Animated,
 } from 'react-native';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -27,6 +27,8 @@ export const Input: React.FC<InputProps> = ({
   onBlur,
   ...props
 }) => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
   const [isFocused, setIsFocused] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -80,7 +82,7 @@ export const Input: React.FC<InputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: {
     marginBottom: theme.spacing.md,
   },
@@ -92,7 +94,7 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.backgroundCard,
     borderWidth: 2,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.lg,

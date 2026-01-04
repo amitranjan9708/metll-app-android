@@ -14,11 +14,13 @@ import { useNavigation } from '@react-navigation/native';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 import { User } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 
 export const RegisterScreen: React.FC = () => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
   const navigation = useNavigation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -177,7 +179,7 @@ export const RegisterScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   gradient: {
     flex: 1,
   },

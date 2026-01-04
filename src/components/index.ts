@@ -3,4 +3,7 @@ export { Input } from './Input';
 export { OTPInput } from './OTPInput';
 export { ImagePickerComponent } from './ImagePicker';
 export { Card } from './Card';
+export { VerificationBadge } from './VerificationBadge';
+export { VideoRecorder } from './VideoRecorder';
+export { ThemeSelector } from './ThemeSelector';
 

@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 
 interface OTPInputProps {
   length?: number;
@@ -18,6 +18,8 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   value,
   onChange,
 }) => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const scaleAnims = useRef(Array.from({ length }, () => new Animated.Value(1))).current;
@@ -110,7 +112,7 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -124,7 +126,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 56,
     borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.backgroundCard,
     borderWidth: 2,
     borderColor: theme.colors.border,
     textAlign: 'center',

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Image, TouchableOpacity, StyleSheet, Text, Alert, Animated } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 
 interface ImagePickerProps {
@@ -16,6 +16,8 @@ export const ImagePickerComponent: React.FC<ImagePickerProps> = ({
   currentImage,
   label = 'Profile Photo',
 }) => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
   const [image, setImage] = useState<string | undefined>(currentImage);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const borderRotate = useRef(new Animated.Value(0)).current;
@@ -142,7 +144,7 @@ export const ImagePickerComponent: React.FC<ImagePickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: {
     marginBottom: theme.spacing.lg,
     alignItems: 'center',
@@ -173,7 +175,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.backgroundCard,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',

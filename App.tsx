@@ -4,25 +4,33 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { LoadingScreen } from './src/components/LoadingScreen';
 import { useAppFonts } from './src/theme/fonts';
-import { theme } from './src/theme';
+
+const AppContent = () => {
+  const { colors, isDark } = useTheme();
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={colors.background} />
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
+    </>
+  );
+};
 
 export default function App() {
   const fontsLoaded = useAppFonts();
 
-  if (!fontsLoaded) {
-    return <LoadingScreen />;
-  }
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar style="dark" backgroundColor={theme.colors.background} />
-          <AppNavigator />
-        </AuthProvider>
+        <ThemeProvider>
+          {!fontsLoaded ? <LoadingScreen /> : <AppContent />}
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

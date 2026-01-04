@@ -13,11 +13,13 @@ import { useRoute } from '@react-navigation/native';
 import { Button } from '../components/Button';
 import { OTPInput } from '../components/OTPInput';
 import { Card } from '../components/Card';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export const OTPScreen: React.FC = () => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
   const route = useRoute();
   const { login } = useAuth();
   const [otp, setOtp] = useState('');
@@ -147,7 +149,7 @@ export const OTPScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   gradient: {
     flex: 1,
   },

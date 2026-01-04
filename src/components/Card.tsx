@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -9,6 +9,9 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, style, variant = 'default' }) => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
+
   const getCardStyle = () => {
     switch (variant) {
       case 'elevated':
@@ -23,9 +26,9 @@ export const Card: React.FC<CardProps> = ({ children, style, variant = 'default'
   return <View style={getCardStyle()}>{children}</View>;
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.backgroundCard,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     borderWidth: 1,

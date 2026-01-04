@@ -1,11 +1,16 @@
 import { colors } from './colors';
+import { colorsDark } from './colorsDark';
 import { typography } from './typography';
 import { gradients } from './gradients';
+import { gradientsDark } from './gradientsDark';
 
+// Default export (will be overridden by ThemeContext in components)
 export const theme = {
   colors,
+  colorsDark,
   typography,
   gradients,
+  gradientsDark,
   spacing: {
     xs: 4,
     sm: 8,

@@ -12,12 +12,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { theme } from '../theme';
+import { ThemeSelector } from '../components/ThemeSelector';
+import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const theme = useTheme();
+  const styles = getStyles(theme);
 
   const handleLogout = () => {
     Alert.alert(
@@ -95,6 +98,8 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Settings List */}
         <Card style={styles.settingsCard}>
+          <ThemeSelector />
+          <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
           {settingsItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -132,7 +137,7 @@ export const SettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   scrollContent: { padding: theme.spacing.lg },
@@ -140,10 +145,10 @@ const styles = StyleSheet.create({
   profileImageWrapper: { position: 'relative', marginBottom: theme.spacing.md },
   profileRing: { position: 'absolute', width: 108, height: 108, borderRadius: 54, top: -4, left: -4 },
   profilePhoto: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: theme.colors.white },
-  profilePhotoPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: theme.colors.white, ...theme.shadows.md },
+  profilePhotoPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: theme.colors.backgroundCard, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: theme.colors.border, ...theme.shadows.md },
   profileName: { ...theme.typography.heading, color: theme.colors.textPrimary, marginBottom: theme.spacing.xs },
   profileEmail: { ...theme.typography.body, color: theme.colors.textSecondary, marginBottom: theme.spacing.lg },
-  statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.xl, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadows.sm },
+  statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.backgroundCard, borderRadius: theme.borderRadius.xl, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadows.sm },
   statItem: { alignItems: 'center', flex: 1, gap: 4 },
   statNumber: { ...theme.typography.subheading, color: theme.colors.textPrimary },
   statLabel: { ...theme.typography.caption, color: theme.colors.textSecondary },
@@ -156,4 +161,5 @@ const styles = StyleSheet.create({
   settingsItemText: { ...theme.typography.body, color: theme.colors.textPrimary },
   logoutButton: { marginTop: theme.spacing.md },
   versionText: { ...theme.typography.caption, color: theme.colors.textSecondary, textAlign: 'center', marginTop: theme.spacing.xl, marginBottom: theme.spacing.lg },
+  divider: { height: 1, marginVertical: theme.spacing.sm },
 });

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
 
 interface ButtonProps {
   title: string;
@@ -35,6 +35,8 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   fullWidth = true,
 }) => {
+  const theme = useTheme();
+  const styles = getStyles(theme);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -187,7 +189,7 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   animatedContainer: {
     alignSelf: 'stretch',
   },
@@ -212,13 +214,13 @@ const styles = StyleSheet.create({
     ...theme.shadows.glowAccent,
   },
   secondaryButton: {
-    backgroundColor: '#A4B8E7',
+    backgroundColor: theme.colors.primaryLight,
     ...theme.shadows.sm,
   },
   outlineButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#5A6FA3',
+    borderColor: theme.colors.primary,
   },
   disabled: {
     opacity: 0.5,
@@ -237,7 +239,7 @@ const styles = StyleSheet.create({
   },
   outlineText: {
     ...theme.typography.button,
-    color: '#5A6FA3',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
 });
