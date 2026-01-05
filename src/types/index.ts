@@ -4,11 +4,30 @@ export interface User {
   email: string;
   phone: string;
   photo?: string;
+  additionalPhotos?: string[];
+  verificationVideo?: string;
   school?: SchoolDetails;
   college?: CollegeDetails;
   office?: OfficeDetails;
   homeLocation?: LocationDetails;
+  situationResponses?: SituationResponse[];
   createdAt: string;
+}
+
+export type SituationCategory = 'Dating' | 'Social' | 'Adventure' | 'Life' | 'Entertainment' | 'Ethics';
+
+export interface SituationQuestion {
+  id: number;
+  category: SituationCategory;
+  emoji: string;
+  question: string;
+  placeholder: string;
+}
+
+export interface SituationResponse {
+  questionId: number;
+  answer: string;
+  answeredAt: string;
 }
 
 export interface SchoolDetails {

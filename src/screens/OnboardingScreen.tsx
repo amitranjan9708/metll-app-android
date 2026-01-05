@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,6 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { ImagePickerComponent } from '../components/ImagePicker';
-import { VideoRecorder } from '../components/VideoRecorder';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -27,13 +26,13 @@ import {
 } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 
-type OnboardingStep = 'photo' | 'video' | 'school' | 'college' | 'office' | 'home' | 'complete';
+// Removed 'video' from steps - video verification now happens in PhotoUploadScreen
+type OnboardingStep = 'photo' | 'school' | 'college' | 'office' | 'home' | 'complete';
 
-const STEPS: OnboardingStep[] = ['photo', 'video', 'school', 'college', 'office', 'home'];
+const STEPS: OnboardingStep[] = ['photo', 'school', 'college', 'office', 'home'];
 
 const STEP_CONFIG = {
   photo: { icon: 'camera-outline', title: 'Profile Photo' },
-  video: { icon: 'videocam-outline', title: 'Video Verification' },
   school: { icon: 'school-outline', title: 'School' },
   college: { icon: 'library-outline', title: 'College' },
   office: { icon: 'business-outline', title: 'Office' },
@@ -43,11 +42,10 @@ const STEP_CONFIG = {
 export const OnboardingScreen: React.FC = () => {
   const theme = useTheme();
   const styles = getStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { user, updateUser } = useAuth();
   const [step, setStep] = useState<OnboardingStep>('photo');
   const [photo, setPhoto] = useState('');
-  const [videoUri, setVideoUri] = useState('');
 
   const [hasSchool, setHasSchool] = useState(false);
   const [schoolName, setSchoolName] = useState('');
@@ -100,12 +98,6 @@ export const OnboardingScreen: React.FC = () => {
       case 'photo':
         if (!photo) {
           Alert.alert('Required', 'Please upload your profile photo');
-          return false;
-        }
-        return true;
-      case 'video':
-        if (!videoUri) {
-          Alert.alert('Required', 'Please record a verification video');
           return false;
         }
         return true;
@@ -169,24 +161,6 @@ export const OnboardingScreen: React.FC = () => {
     }
   };
 
-  const handleVideoRecorded = (uri: string) => {
-    setVideoUri(uri);
-    // Automatically move to next step after video is recorded
-    animateTransition('forward');
-    setTimeout(() => {
-      const currentIndex = STEPS.indexOf(step);
-      if (currentIndex < STEPS.length - 1) {
-        setStep(STEPS[currentIndex + 1]);
-      }
-    }, 150);
-  };
-
-  const handleVideoCancel = () => {
-    // Go back to photo step if user cancels video recording
-    animateTransition('back');
-    setTimeout(() => setStep('photo'), 150);
-  };
-
   const handleComplete = async () => {
     if (!checkAtLeastOne()) return;
 
@@ -234,7 +208,11 @@ export const OnboardingScreen: React.FC = () => {
         office,
         homeLocation,
       });
-      // Navigation will automatically happen via AppNavigator based on auth state
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'PhotoUpload' }],
+      });
     } catch (error) {
       Alert.alert('Error', 'Failed to save profile. Please try again.');
     }
@@ -245,7 +223,7 @@ export const OnboardingScreen: React.FC = () => {
       {STEPS.map((s, index) => {
         const isActive = STEPS.indexOf(step) >= index;
         const isCurrent = step === s;
-        const config = STEP_CONFIG[s];
+        const config = STEP_CONFIG[s as keyof typeof STEP_CONFIG];
 
         return (
           <View key={s} style={styles.stepItem}>
@@ -399,28 +377,19 @@ export const OnboardingScreen: React.FC = () => {
       {renderStepIndicator()}
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        {step === 'video' ? (
-          <VideoRecorder
-            onVideoRecorded={handleVideoRecorded}
-            onCancel={handleVideoCancel}
-            minDuration={3}
-            maxDuration={5}
-          />
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Animated.View style={[styles.animatedContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
-              <Card style={styles.card}>
-                {renderStep()}
-                <View style={styles.buttonContainer}>
-                  {step !== 'photo' && (
-                    <Button title="Back" onPress={handleBack} variant="outline" style={styles.backButton} />
-                  )}
-                  <Button title={step === 'home' ? 'Complete' : 'Next'} onPress={handleNext} style={styles.nextButton} />
-                </View>
-              </Card>
-            </Animated.View>
-          </ScrollView>
-        )}
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.animatedContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+            <Card style={styles.card}>
+              {renderStep()}
+              <View style={styles.buttonContainer}>
+                {step !== 'photo' && (
+                  <Button title="Back" onPress={handleBack} variant="outline" style={styles.backButton} />
+                )}
+                <Button title={step === 'home' ? 'Complete' : 'Next'} onPress={handleNext} style={styles.nextButton} />
+              </View>
+            </Card>
+          </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );

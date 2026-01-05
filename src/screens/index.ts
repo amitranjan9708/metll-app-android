@@ -4,4 +4,8 @@ export { OnboardingScreen } from './OnboardingScreen';
 export { HomeScreen } from './HomeScreen';
 export { LiveMatchingScreen } from './LiveMatchingScreen';
 export { SettingsScreen } from './SettingsScreen';
-
+export { SituationIntroScreen } from './SituationIntroScreen';
+export { SituationSelectionScreen } from './SituationSelectionScreen';
+export { SituationAnswerScreen } from './SituationAnswerScreen';
+export { PhotoUploadScreen } from './PhotoUploadScreen';
+export { DateScreen } from './DateScreen';
