@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 
@@ -34,7 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (userData: User) => {
+  // Memoize callbacks to prevent unnecessary re-renders
+  const login = useCallback(async (userData: User) => {
     try {
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
@@ -42,40 +43,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error saving user:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await AsyncStorage.removeItem('user');
       setUser(null);
     } catch (error) {
       console.error('Error logging out:', error);
     }
-  };
+  }, []);
 
-  const updateUser = async (userData: Partial<User>) => {
-    if (!user) return;
-    const updatedUser = { ...user, ...userData };
-    try {
-      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      throw error;
-    }
-  };
+  const updateUser = useCallback(async (userData: Partial<User>) => {
+    setUser(currentUser => {
+      if (!currentUser) return null;
+      const updatedUser = { ...currentUser, ...userData };
+      // Save to AsyncStorage asynchronously (non-blocking)
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(err => {
+        console.error('Error updating user:', err);
+      });
+      return updatedUser;
+    });
+  }, []);
+
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo(() => ({
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    login,
+    logout,
+    updateUser,
+  }), [user, isLoading, login, logout, updateUser]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        logout,
-        updateUser,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -88,4 +90,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

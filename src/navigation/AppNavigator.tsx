@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -88,31 +88,62 @@ const MainTabs = () => {
   );
 };
 
+// Helper function to determine the initial route (called only once)
+const getInitialRoute = (isAuthenticated: boolean, user: any): string => {
+  if (!isAuthenticated) return "Register";
+  if (!user?.photo) return "Onboarding";
+  if (!user?.additionalPhotos || user.additionalPhotos.length < 3) return "PhotoUpload";
+  if (!user?.situationResponses || user.situationResponses.length < 5) return "SituationIntro";
+  return "Main";
+};
+
 export const AppNavigator = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const theme = useTheme();
 
-  // Calculate initial route only once on mount (or when auth state fundamentally changes)
-  const initialRouteName = useMemo(() => {
-    if (!isAuthenticated) return "Register";
+  // Store the initial route in a ref so it NEVER changes after first calculation
+  // This is the key fix - we only calculate once on mount
+  const initialRouteRef = useRef<string | null>(null);
 
-    // Determine which onboarding step is needed
-    if (!user?.photo) return "Onboarding";
-    if (!user?.additionalPhotos || user.additionalPhotos.length < 3) return "PhotoUpload";
-    if (!user?.situationResponses || user.situationResponses.length < 5) return "SituationIntro";
+  if (!isLoading && initialRouteRef.current === null) {
+    initialRouteRef.current = getInitialRoute(isAuthenticated, user);
+  }
 
-    return "Main";
-  }, [isAuthenticated, user?.photo, user?.additionalPhotos?.length, user?.situationResponses?.length]);
+  // Use a ref for the navigation container to dispatch actions
+  const navigationRef = React.useRef<any>(null);
+
+  // Handle Auth State Changes (Login/Logout)
+  // We ONLY watch isAuthenticated to avoid jitter from user data updates during onboarding
+  React.useEffect(() => {
+    if (isLoading || !navigationRef.current) return;
+
+    if (!isAuthenticated) {
+      // Logout: Reset to Register
+      navigationRef.current.reset({
+        index: 0,
+        routes: [{ name: 'Register' }],
+      });
+    } else {
+      // Login: Determine where to go based on user state
+      const targetRoute = getInitialRoute(true, user);
+
+      // Only reset if we are on an auth screen (optimization)
+      // or if we want to ensure we land on the right spot after login
+      navigationRef.current.reset({
+        index: 0,
+        routes: [{ name: targetRoute }],
+      });
+    }
+  }, [isAuthenticated, isLoading]); // Deliberately exclude 'user' to prevent jitter
 
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // KEY FIX: All screens are registered unconditionally.
-  // Navigation between screens happens via explicit navigation calls (navigate/reset).
-  // This prevents unmount/remount jitter when auth state changes during onboarding.
+  const initialRouteName = initialRouteRef.current || "Register";
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName={initialRouteName}
         screenOptions={{
@@ -120,14 +151,9 @@ export const AppNavigator = () => {
           cardStyle: {
             backgroundColor: theme.colors.background,
           },
-          // Disable gestures to prevent accidental back navigation during onboarding
           gestureEnabled: false,
-          // Use fade animation for smoother transitions
-          cardStyleInterpolator: ({ current }) => ({
-            cardStyle: {
-              opacity: current.progress,
-            },
-          }),
+          // Use simple fade for smooth transitions
+          ...TransitionPresets.FadeFromBottomAndroid,
         }}
       >
         {/* Auth Screens */}
