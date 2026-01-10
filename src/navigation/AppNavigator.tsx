@@ -18,6 +18,8 @@ import { SituationSelectionScreen } from '../screens/SituationSelectionScreen';
 import { SituationAnswerScreen } from '../screens/SituationAnswerScreen';
 import { PhotoUploadScreen } from '../screens/PhotoUploadScreen';
 import { DateScreen } from '../screens/DateScreen';
+import { MatchesScreen } from '../screens/MatchesScreen';
+import { ChatScreen } from '../screens/ChatScreen';
 import { LoadingScreen } from '../components/LoadingScreen';
 
 const Stack = createStackNavigator();
@@ -74,6 +76,14 @@ const MainTabs = () => {
         options={{
           title: 'Date',
           tabBarIcon: ({ focused }) => <TabBarIcon name="rose" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Matches"
+        component={MatchesScreen}
+        options={{
+          title: 'Matches',
+          tabBarIcon: ({ focused }) => <TabBarIcon name="chatbubbles" focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -169,6 +179,16 @@ export const AppNavigator = () => {
 
         {/* Main App */}
         <Stack.Screen name="Main" component={MainTabs} />
+
+        {/* Chat Features */}
+        <Stack.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={{
+            gestureEnabled: true,
+            ...TransitionPresets.SlideFromRightIOS,
+          }}
+        />
 
         {/* Auxiliary Screens */}
         <Stack.Screen

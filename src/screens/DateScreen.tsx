@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,64 +8,58 @@ import {
     PanResponder,
     TouchableOpacity,
     Image,
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../components/Card';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { swipeApi } from '../services/api';
+import { Profile, MatchData } from '../types';
+import { MatchModal } from '../components/MatchModal';
+import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
-// Dummy Data
-const DUMMY_PROFILES = [
-    {
-        id: '1',
-        name: 'Sarah',
-        age: 24,
-        distance: '3 km away',
-        bio: 'Coffee lover ☕ | Travel enthusiast ✈️',
-        photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    },
-    {
-        id: '2',
-        name: 'Jessica',
-        age: 26,
-        distance: '5 km away',
-        bio: 'Art student 🎨 | Looking for someone to explore museums with.',
-        photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    },
-    {
-        id: '3',
-        name: 'Emily',
-        age: 23,
-        distance: '12 km away',
-        bio: 'Music is life 🎵 | Let\'s go to a concert!',
-        photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    },
-    {
-        id: '4',
-        name: 'Maya',
-        age: 25,
-        distance: '2 km away',
-        bio: 'Foodie 🍕 | Yoga instructor 🧘‍♀️',
-        photo: 'https://images.unsplash.com/photo-1524504388940-b1a17283620f?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    },
-    {
-        id: '5',
-        name: 'Olivia',
-        age: 22,
-        distance: '8 km away',
-        bio: 'Dog mom 🐶 | Adventure seeker',
-        photo: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    },
-];
-
 export const DateScreen: React.FC = () => {
     const theme = useTheme();
-    const [profiles, setProfiles] = useState(DUMMY_PROFILES);
+    const navigation = useNavigation<any>();
+    const { user } = useAuth();
+
+    const [profiles, setProfiles] = useState<Profile[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [loading, setLoading] = useState(true);
+
+    // Match Modal State
+    const [isMatchModalVisible, setIsMatchModalVisible] = useState(false);
+    const [currentMatch, setCurrentMatch] = useState<MatchData | null>(null);
 
     const position = useRef(new Animated.ValueXY()).current;
+
+    // Load profiles when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            if (profiles.length === 0) {
+                loadProfiles();
+            }
+        }, [])
+    );
+
+    const loadProfiles = async () => {
+        setLoading(true);
+        try {
+            const data = await swipeApi.getProfiles();
+            setProfiles(data);
+            setCurrentIndex(0);
+        } catch (error) {
+            console.error('Failed to load profiles:', error);
+            // Optionally show error toast
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Rotation interpolation based on movement
     const rotate = position.x.interpolate({
@@ -123,14 +117,30 @@ export const DateScreen: React.FC = () => {
         Animated.timing(position, {
             toValue: { x, y: 0 },
             duration: 250,
-            useNativeDriver: false, // Layout changes not supported by native driver
+            useNativeDriver: false,
         }).start(() => onSwipeComplete(direction));
     };
 
-    const onSwipeComplete = (direction: 'right' | 'left') => {
-        // Logic for match or pass can go here
+    const onSwipeComplete = async (direction: 'right' | 'left') => {
+        const currentProfile = profiles[currentIndex];
+
+        // Optimistically move to next card
         position.setValue({ x: 0, y: 0 });
         setCurrentIndex(prevIndex => prevIndex + 1);
+
+        // API Call
+        try {
+            const response = await swipeApi.swipe(currentProfile.id, direction === 'right' ? 'like' : 'pass');
+
+            if (response.data.isMatch && response.data.match) {
+                // Show Match Modal
+                setCurrentMatch(response.data.match as MatchData);
+                setIsMatchModalVisible(true);
+            }
+        } catch (error) {
+            console.error('Swipe failed:', error);
+            // In a robust app, we might revert the card stack or show error
+        }
     };
 
     const resetPosition = () => {
@@ -141,9 +151,26 @@ export const DateScreen: React.FC = () => {
         }).start();
     };
 
+    const handleSendMessage = () => {
+        setIsMatchModalVisible(false);
+        if (currentMatch) {
+            navigation.navigate('Chat', {
+                matchId: currentMatch.id,
+                userName: currentMatch.matchedUser.name,
+                userPhoto: currentMatch.matchedUser.profilePhoto || currentMatch.matchedUser.images[0]
+            });
+        }
+    };
+
     const styles = getStyles(theme);
 
     const renderNoMoreProfiles = () => {
+        if (loading) return (
+            <View style={styles.noMoreContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+        );
+
         return (
             <View style={styles.noMoreContainer}>
                 <View style={[styles.noMoreIcon, { backgroundColor: theme.colors.primary + '20' }]}>
@@ -155,7 +182,7 @@ export const DateScreen: React.FC = () => {
                 <Text style={[styles.noMoreSubtext, { color: theme.colors.textSecondary }]}>
                     Check back later for more matches!
                 </Text>
-                <Button title="Refresh" onPress={() => setCurrentIndex(0)} variant="outline" style={{ marginTop: 20 }} />
+                <Button title="Refresh" onPress={loadProfiles} variant="outline" style={{ marginTop: 20 }} />
             </View>
         );
     };
@@ -187,15 +214,23 @@ export const DateScreen: React.FC = () => {
                         {...panResponder.panHandlers}
                     >
                         <Card style={styles.card} variant="default">
-                            <Image source={{ uri: item.photo }} style={styles.cardImage} />
+                            <Image
+                                source={{ uri: item.profilePhoto || item.images[0] || 'https://via.placeholder.com/400' }}
+                                style={styles.cardImage}
+                            />
 
                             <LinearGradient
                                 colors={['transparent', 'rgba(0,0,0,0.8)']}
                                 style={styles.cardGradient}
                             >
-                                <Text style={styles.cardName}>{item.name}, {item.age}</Text>
-                                <Text style={styles.cardDistance}>{item.distance}</Text>
-                                <Text style={styles.cardBio} numberOfLines={2}>{item.bio}</Text>
+                                <View style={styles.profileHeader}>
+                                    <Text style={styles.cardName}>{item.name}, {item.age}</Text>
+                                    {item.isVerified && (
+                                        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" style={{ marginLeft: 8 }} />
+                                    )}
+                                </View>
+                                <Text style={styles.cardDistance}>{item.distance || 'Nearby'}</Text>
+                                <Text style={styles.cardBio} numberOfLines={3}>{item.bio}</Text>
                             </LinearGradient>
 
                             {/* OVERLAY LABELS */}
@@ -224,13 +259,16 @@ export const DateScreen: React.FC = () => {
                         ]}
                     >
                         <Card style={styles.card} variant="default">
-                            <Image source={{ uri: item.photo }} style={styles.cardImage} />
+                            <Image
+                                source={{ uri: item.profilePhoto || item.images[0] || 'https://via.placeholder.com/400' }}
+                                style={styles.cardImage}
+                            />
                             <LinearGradient
                                 colors={['transparent', 'rgba(0,0,0,0.8)']}
                                 style={styles.cardGradient}
                             >
                                 <Text style={styles.cardName}>{item.name}, {item.age}</Text>
-                                <Text style={styles.cardDistance}>{item.distance}</Text>
+                                <Text style={styles.cardDistance}>{item.distance || 'Nearby'}</Text>
                                 <Text style={styles.cardBio} numberOfLines={2}>{item.bio}</Text>
                             </LinearGradient>
                         </Card>
@@ -275,6 +313,14 @@ export const DateScreen: React.FC = () => {
                     </TouchableOpacity>
                 </View>
             )}
+
+            <MatchModal
+                visible={isMatchModalVisible}
+                currentUser={user}
+                matchedUser={currentMatch?.matchedUser || null}
+                onSendMessage={handleSendMessage}
+                onKeepSwiping={() => setIsMatchModalVisible(false)}
+            />
         </LinearGradient>
     );
 };
@@ -311,7 +357,7 @@ const Button = ({ title, onPress, variant = 'primary', style }: any) => {
     );
 };
 
-const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         flex: 1,
     },
@@ -325,6 +371,7 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 20,
+        flex: 1,
     },
     noMoreIcon: {
         width: 100,
@@ -367,9 +414,14 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        height: 160,
+        height: 180,
         justifyContent: 'flex-end',
         padding: 20,
+    },
+    profileHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
     },
     cardName: {
         ...theme.typography.heading,
@@ -380,14 +432,15 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
         ...theme.typography.caption,
         color: '#fff',
         opacity: 0.8,
-        marginTop: 4,
+        marginTop: 0,
     },
     cardBio: {
         ...theme.typography.body,
         color: '#fff',
         marginTop: 8,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 16,
+        lineHeight: 22,
+        fontWeight: '500',
     },
     likeLabel: {
         position: 'absolute',

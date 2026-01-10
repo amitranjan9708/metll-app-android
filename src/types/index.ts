@@ -95,3 +95,72 @@ export interface Match {
   matchedAt: string;
 }
 
+// ==========================================
+// Swipe & Match Types
+// ==========================================
+
+export interface Profile {
+  id: number;
+  name: string;
+  bio?: string;
+  age?: number;
+  gender?: string;
+  images: string[];
+  profilePhoto?: string;
+  isVerified: boolean;
+  latitude?: number;
+  longitude?: number;
+  distance?: string;
+}
+
+export interface MatchedUser {
+  id: number;
+  name: string;
+  images: string[];
+  profilePhoto?: string;
+  bio?: string;
+  age?: number;
+  isVerified: boolean;
+}
+
+export interface MatchData {
+  id: number;
+  matchedUser: MatchedUser;
+  matchedAt: string;
+  chatRoomId?: number;
+  lastMessage?: Message;
+  unreadCount?: number;
+}
+
+export interface Message {
+  id: number;
+  senderId: number;
+  senderName?: string;
+  content: string | null;
+  type?: 'text' | 'image' | 'video';
+  mediaUrl?: string;
+  createdAt: string;
+  isRead: boolean;
+  isOwn?: boolean;
+}
+
+export interface ChatRoom {
+  id: number;
+  matchId: number;
+  messages: Message[];
+}
+
+export interface SwipeResponse {
+  success: boolean;
+  message: string;
+  data: {
+    direction: 'like' | 'pass';
+    isMatch: boolean;
+    match?: {
+      id: number;
+      matchedUser: MatchedUser;
+      matchedAt: string;
+      chatRoomId?: number;
+    };
+  };
+}
