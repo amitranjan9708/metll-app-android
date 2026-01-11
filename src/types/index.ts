@@ -11,6 +11,7 @@ export interface User {
   office?: OfficeDetails;
   homeLocation?: LocationDetails;
   situationResponses?: SituationResponse[];
+  isOnboarded?: boolean; // Local flag to track onboarding completion
   createdAt: string;
 }
 

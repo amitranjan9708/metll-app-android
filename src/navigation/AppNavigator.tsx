@@ -126,16 +126,17 @@ export const AppNavigator = () => {
   console.log('AppNavigator render:', { 
     isAuthenticated, 
     isLoading, 
+    isOnboarded: user?.isOnboarded,
     hasPhoto: !!user?.photo,
-    hasSituationResponses: user?.situationResponses?.length || 0
   });
 
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // Onboarding is complete when user has situation responses (final step)
-  const needsOnboarding = isAuthenticated && user && (!user.situationResponses || user.situationResponses.length === 0);
+  // Use local isOnboarded flag - this is the primary source of truth
+  // User needs onboarding if authenticated but not yet marked as onboarded locally
+  const needsOnboarding = isAuthenticated && user && !user.isOnboarded;
 
   return (
     <NavigationContainer>

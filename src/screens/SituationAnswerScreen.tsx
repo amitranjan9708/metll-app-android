@@ -40,7 +40,7 @@ export const SituationAnswerScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<RouteParams, 'SituationAnswer'>>();
     const insets = useSafeAreaInsets();
-    const { updateUser } = useAuth();
+    const { updateUser, completeOnboarding } = useAuth();
 
     const { selectedQuestions } = route.params;
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -143,9 +143,14 @@ export const SituationAnswerScreen: React.FC = () => {
         }));
 
         try {
+            // Save situation responses locally
             await updateUser({ situationResponses: responses });
+            
+            // Mark onboarding as complete - this sets the local isOnboarded flag
+            await completeOnboarding();
+            
             // Navigation will automatically switch to Main app due to auth state change
-            // (user now has situation responses, so needsOnboarding becomes false)
+            // (user.isOnboarded is now true, so needsOnboarding becomes false)
         } catch (error) {
             Alert.alert('Error', 'Failed to save your answers. Please try again.');
         }

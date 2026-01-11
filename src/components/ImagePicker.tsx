@@ -11,6 +11,17 @@ interface ImagePickerProps {
   label?: string;
 }
 
+// Modern, soft color palette for the image picker
+const PICKER_COLORS = {
+  gradientStart: '#667EEA',      // Soft purple-blue
+  gradientMiddle: '#9B8FE8',     // Light lavender
+  gradientEnd: '#A8E6CF',        // Soft mint green
+  accentIcon: '#667EEA',         // Matches gradient start
+  placeholderBg: '#F0F4FF',      // Very light blue tint
+  editButtonStart: '#667EEA',    // Soft purple
+  editButtonEnd: '#764BA2',      // Deeper purple
+};
+
 export const ImagePickerComponent: React.FC<ImagePickerProps> = ({
   onImageSelected,
   currentImage,
@@ -21,29 +32,41 @@ export const ImagePickerComponent: React.FC<ImagePickerProps> = ({
   const [image, setImage] = useState<string | undefined>(currentImage);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const borderRotate = useRef(new Animated.Value(0)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!image) {
+      // Gentle pulse animation for empty state
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 1500,
+            toValue: 1.03,
+            duration: 2000,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 1500,
+            duration: 2000,
             useNativeDriver: true,
           }),
         ])
       ).start();
     }
 
+    // Smooth rotating gradient border
     Animated.loop(
       Animated.timing(borderRotate, {
         toValue: 1,
-        duration: 4000,
+        duration: 6000,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    // Shimmer effect for visual interest
+    Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 3000,
         useNativeDriver: true,
       })
     ).start();
@@ -108,38 +131,66 @@ export const ImagePickerComponent: React.FC<ImagePickerProps> = ({
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <TouchableOpacity style={styles.imageWrapper} onPress={showOptions} activeOpacity={0.8}>
+
+      <TouchableOpacity style={styles.imageWrapper} onPress={showOptions} activeOpacity={0.85}>
+        {/* Outer glow effect */}
+        <View style={styles.outerGlow} />
+
         {/* Rotating gradient border */}
         <Animated.View style={[styles.gradientBorder, { transform: [{ rotate: spin }] }]}>
           <LinearGradient
-            colors={[theme.colors.primary, theme.colors.accent, theme.colors.primaryLight, theme.colors.primary]}
+            colors={[
+              PICKER_COLORS.gradientStart,
+              PICKER_COLORS.gradientMiddle,
+              PICKER_COLORS.gradientEnd,
+              PICKER_COLORS.gradientStart
+            ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradientFill}
           />
         </Animated.View>
 
+        {/* Inner container with image or placeholder */}
         <View style={styles.imageContainer}>
           {image ? (
             <Image source={{ uri: image }} style={styles.image} />
           ) : (
             <Animated.View style={[styles.placeholder, { transform: [{ scale: pulseAnim }] }]}>
-              <Ionicons name="heart" size={40} color={theme.colors.accent} />
-              <Text style={styles.placeholderText}>Add your photo</Text>
+              {/* Subtle gradient background for empty state */}
+              <LinearGradient
+                colors={[PICKER_COLORS.placeholderBg, '#FFFFFF']}
+                style={styles.placeholderGradient}
+              >
+                <View style={styles.iconContainer}>
+                  <Ionicons name="person-add" size={36} color={PICKER_COLORS.accentIcon} />
+                </View>
+                <Text style={styles.placeholderText}>Add your photo</Text>
+                <Text style={styles.placeholderHint}>Tap to select</Text>
+              </LinearGradient>
             </Animated.View>
           )}
         </View>
 
-        {/* Edit button */}
+        {/* Modern edit button */}
         <View style={styles.editButtonWrapper}>
           <LinearGradient
-            colors={theme.gradients.primary.colors as [string, string]}
+            colors={[PICKER_COLORS.editButtonStart, PICKER_COLORS.editButtonEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.editButton}
           >
-            <Ionicons name="camera" size={18} color={theme.colors.white} />
+            <Ionicons name={image ? "pencil" : "camera"} size={18} color="#FFFFFF" />
           </LinearGradient>
         </View>
       </TouchableOpacity>
+
+      {/* Helper text */}
+      {!image && (
+        <Text style={styles.helperText}>
+          Choose a clear, well-lit photo of yourself
+        </Text>
+      )}
     </View>
   );
 };
@@ -155,31 +206,42 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   imageWrapper: {
-    width: 160,
-    height: 160,
+    width: 180,
+    height: 180,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
+  outerGlow: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(102, 126, 234, 0.08)',
+  },
   gradientBorder: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 175,
+    height: 175,
+    borderRadius: 87.5,
     overflow: 'hidden',
   },
   gradientFill: {
     flex: 1,
   },
   imageContainer: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     backgroundColor: theme.colors.backgroundCard,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.md,
+    shadowColor: '#667EEA',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   image: {
     width: '100%',
@@ -188,30 +250,59 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   placeholder: {
     width: '100%',
     height: '100%',
+    overflow: 'hidden',
+    borderRadius: 80,
+  },
+  placeholderGradient: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.primaryLight + '30',
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   placeholderText: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.sm,
+    fontSize: 14,
+    fontWeight: '600',
+    color: PICKER_COLORS.accentIcon,
+    marginBottom: 4,
+  },
+  placeholderHint: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
   },
   editButtonWrapper: {
     position: 'absolute',
-    bottom: 5,
-    right: 5,
-    borderRadius: 20,
+    bottom: 8,
+    right: 8,
+    borderRadius: 22,
     overflow: 'hidden',
-    ...theme.shadows.glow,
+    shadowColor: '#667EEA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
   },
   editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: theme.colors.white,
+    borderColor: '#FFFFFF',
+  },
+  helperText: {
+    marginTop: theme.spacing.md,
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
   },
 });
+

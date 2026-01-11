@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
-import { authApi } from '../services/api';
+import { authApi, setOnUnauthorizedCallback } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (user: User) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: Partial<User>, skipBackendSync?: boolean) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,18 +19,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Register global 401 handler
   useEffect(() => {
-    loadUser();
+    setOnUnauthorizedCallback(() => {
+      console.log('🔒 Global 401 received, logging out...');
+      handleForceLogout();
+    });
   }, []);
 
-  const loadUser = async () => {
+  // Force logout when user is deleted or token is invalid
+  const handleForceLogout = async () => {
+    try {
+      await AsyncStorage.multiRemove(['user', 'authToken']);
+      setUser(null);
+      console.log('🚪 User logged out due to invalid session');
+    } catch (error) {
+      console.error('Error during force logout:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadLocalUser();
+  }, []);
+
+  // Load user from local storage - PRIMARY source of truth for onboarding status
+  const loadLocalUser = async () => {
     try {
       const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
+      
+      if (!userData) {
+        // No local user, stay logged out
+        console.log('📱 No local user data found');
+        setIsLoading(false);
+        return;
+      }
+
+      const parsedUser = JSON.parse(userData);
+      console.log('📱 Loaded local user:', { 
+        id: parsedUser.id, 
+        name: parsedUser.name,
+        isOnboarded: parsedUser.isOnboarded,
+        hasPhoto: !!parsedUser.photo,
+        hasSituationResponses: parsedUser.situationResponses?.length || 0
+      });
+      
+      // Set user from local storage - LOCAL DATA IS PRIMARY
+      setUser(parsedUser);
+      
+      // Only validate session if user is already onboarded
+      // This prevents overwriting local onboarding data
+      if (parsedUser.isOnboarded) {
+        console.log('🔍 User is onboarded, validating session with backend...');
+        try {
+          const validation = await authApi.validateSession();
+          
+          if (!validation.valid) {
+            // User was deleted or token is invalid
+            console.warn('❌ Session invalid:', validation.message);
+            await handleForceLogout();
+          } else {
+            console.log('✅ Session valid');
+            // Merge backend data but PRESERVE local isOnboarded flag
+            if (validation.user) {
+              const updatedUser = { 
+                ...parsedUser, 
+                ...validation.user,
+                isOnboarded: parsedUser.isOnboarded, // ALWAYS preserve local onboarding status
+              };
+              setUser(updatedUser);
+              await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ Could not validate session (offline?), using local data');
+          // On error, keep local user (might be offline)
+        }
+      } else {
+        console.log('📱 User not yet onboarded, skipping backend validation');
       }
     } catch (error) {
-      console.error('Error loading user:', error);
+      console.error('Error loading local user:', error);
     } finally {
       setIsLoading(false);
     }
@@ -104,6 +173,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  // Mark onboarding as complete - sets local flag
+  const completeOnboarding = useCallback(async () => {
+    console.log('🎉 Marking onboarding as complete');
+    setUser(currentUser => {
+      if (!currentUser) return null;
+      const updatedUser = { ...currentUser, isOnboarded: true };
+      
+      // Save to AsyncStorage
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(err => {
+        console.error('Error saving onboarding status:', err);
+      });
+      
+      return updatedUser;
+    });
+  }, []);
+
   // Memoize the context value to prevent unnecessary re-renders of consumers
   const contextValue = useMemo(() => ({
     user,
@@ -112,7 +197,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     logout,
     updateUser,
-  }), [user, isLoading, login, logout, updateUser]);
+    completeOnboarding,
+  }), [user, isLoading, login, logout, updateUser, completeOnboarding]);
 
   return (
     <AuthContext.Provider value={contextValue}>

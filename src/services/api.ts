@@ -151,6 +151,13 @@ const logMock = (functionName: string, data: any) => {
     console.log(`   Data:`, JSON.stringify(data, null, 2));
 };
 
+// Global callback for handling 401 errors (user deleted/token invalid)
+let onUnauthorizedCallback: (() => void) | null = null;
+
+export const setOnUnauthorizedCallback = (callback: () => void) => {
+    onUnauthorizedCallback = callback;
+};
+
 // Helper for authenticated requests
 const authFetch = async (endpoint: string, options: RequestInit = {}): Promise<Response> => {
     const token = await getAuthToken();
@@ -171,6 +178,14 @@ const authFetch = async (endpoint: string, options: RequestInit = {}): Promise<R
             ...options,
             headers,
         });
+
+        // Handle 401 Unauthorized - user deleted or token invalid
+        if (response.status === 401) {
+            console.warn('🔒 Unauthorized: User session invalid, logging out...');
+            if (onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
+        }
 
         // Clone response to log it without consuming
         const clonedResponse = response.clone();
@@ -437,13 +452,272 @@ export const authApi = {
     },
 
     /**
+     * Validate session - check if user still exists in backend
+     * Call this on app startup to verify user wasn't deleted
+     */
+    validateSession: async (): Promise<{ valid: boolean; user?: any; message?: string }> => {
+        const token = await getAuthToken();
+        
+        if (!token) {
+            return { valid: false, message: 'No token found' };
+        }
+
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            return { valid: true };
+        }
+
+        try {
+            logRequest('GET', '/auth/me', undefined);
+            const startTime = Date.now();
+            
+            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('GET', '/auth/me', response.status, data, duration);
+
+            if (response.status === 401 || !data.success) {
+                // User deleted or token invalid
+                return { valid: false, message: data.message || 'Session invalid' };
+            }
+
+            return { valid: true, user: data.data?.user };
+        } catch (error: any) {
+            logError('GET', '/auth/me', error);
+            // Network error - don't log out, might just be offline
+            return { valid: true, message: 'Network error, assuming valid' };
+        }
+    },
+
+    /**
+     * Upload profile picture (first step in onboarding)
+     * Backend uploads to Cloudinary and returns the URL
+     */
+    uploadProfilePicture: async (imageUri: string): Promise<{ success: boolean; message?: string; data?: { photo: string; userId: number } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return {
+                success: true,
+                message: 'Profile picture uploaded',
+                data: { photo: imageUri, userId: 1 },
+            };
+        }
+
+        try {
+            const token = await getAuthToken();
+            const formData = new FormData();
+            
+            // Get file info from URI
+            const uriParts = imageUri.split('/');
+            const fileName = uriParts[uriParts.length - 1];
+            
+            formData.append('photo', {
+                uri: imageUri,
+                type: 'image/jpeg',
+                name: fileName || 'profile.jpg',
+            } as any);
+
+            logRequest('POST', '/user/profile-picture', { fileName });
+            const startTime = Date.now();
+
+            const response = await fetch(`${API_BASE_URL}/user/profile-picture`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/user/profile-picture', response.status, data, duration);
+
+            if (response.status === 401 && onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
+
+            return data;
+        } catch (error) {
+            logError('POST', '/user/profile-picture', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upload additional photos (after profile picture)
+     * Backend uploads to Cloudinary and returns URLs
+     */
+    uploadPhotos: async (imageUris: string[]): Promise<{ success: boolean; message?: string; data?: { uploadedUrls: string[]; allPhotos: string[] } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return {
+                success: true,
+                message: 'Photos uploaded',
+                data: { uploadedUrls: imageUris, allPhotos: imageUris },
+            };
+        }
+
+        try {
+            const token = await getAuthToken();
+            const formData = new FormData();
+            
+            imageUris.forEach((uri, index) => {
+                const uriParts = uri.split('/');
+                const fileName = uriParts[uriParts.length - 1];
+                
+                formData.append('images', {
+                    uri: uri,
+                    type: 'image/jpeg',
+                    name: fileName || `photo${index}.jpg`,
+                } as any);
+            });
+
+            logRequest('POST', '/user/photos', { count: imageUris.length });
+            const startTime = Date.now();
+
+            const response = await fetch(`${API_BASE_URL}/user/photos`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/user/photos', response.status, data, duration);
+
+            if (response.status === 401 && onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
+
+            return data;
+        } catch (error) {
+            logError('POST', '/user/photos', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete a photo by index
+     * For profile picture, use index 0
+     * For additional photos, use index 1-5 (maps to 0-4 on backend)
+     */
+    deletePhoto: async (index: number): Promise<{ success: boolean; message?: string }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return { success: true, message: 'Photo deleted' };
+        }
+
+        try {
+            const token = await getAuthToken();
+            
+            // For additional photos, the backend uses 0-based index
+            // Our index 1 = backend index 0, etc.
+            const backendIndex = index > 0 ? index - 1 : 0;
+            const endpoint = index === 0 
+                ? '/user/profile-picture'  // Delete profile picture
+                : `/user/photos/${backendIndex}`;  // Delete additional photo
+            
+            logRequest('DELETE', endpoint, { index });
+            const startTime = Date.now();
+
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('DELETE', endpoint, response.status, data, duration);
+
+            if (response.status === 401 && onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
+
+            return data;
+        } catch (error) {
+            logError('DELETE', '/user/photos', error);
+            return { success: false, message: 'Failed to delete photo' };
+        }
+    },
+
+    /**
+     * Upload verification video
+     * Backend uploads to Cloudinary and returns URL
+     */
+    uploadVerificationVideo: async (videoUri: string): Promise<{ success: boolean; message?: string; data?: { video: string } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return {
+                success: true,
+                message: 'Video uploaded',
+                data: { video: videoUri },
+            };
+        }
+
+        try {
+            const token = await getAuthToken();
+            const formData = new FormData();
+            
+            const uriParts = videoUri.split('/');
+            const fileName = uriParts[uriParts.length - 1];
+            
+            formData.append('video', {
+                uri: videoUri,
+                type: 'video/mp4',
+                name: fileName || 'verification.mp4',
+            } as any);
+
+            logRequest('POST', '/user/verification-video', { fileName });
+            const startTime = Date.now();
+
+            const response = await fetch(`${API_BASE_URL}/user/verification-video`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/user/verification-video', response.status, data, duration);
+
+            if (response.status === 401 && onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
+
+            return data;
+        } catch (error) {
+            logError('POST', '/user/verification-video', error);
+            throw error;
+        }
+    },
+
+    /**
      * Update user profile (sync with backend)
-     * This sends Cloudinary URLs and other profile data to the backend
+     * This sends profile data to the backend
      */
     updateProfile: async (profileData: {
         name?: string;
-        email?: string;
-        photo?: string; // Main profile photo (first photo)
+        bio?: string;
+        age?: number;
+        gender?: string;
+        photo?: string;
         additionalPhotos?: string[];
         verificationVideo?: string;
         school?: any;

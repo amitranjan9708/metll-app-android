@@ -24,7 +24,7 @@ export const SituationIntroScreen: React.FC = () => {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const styles = getStyles(theme);
-    const { updateUser } = useAuth();
+    const { updateUser, completeOnboarding } = useAuth();
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -100,14 +100,14 @@ export const SituationIntroScreen: React.FC = () => {
                     text: 'Skip for Now',
                     style: 'destructive',
                     onPress: async () => {
-                        // Mark onboarding as complete with a skipped marker
+                        // Save empty responses locally
                         await updateUser({ 
-                            situationResponses: [{ 
-                                questionId: -1, 
-                                answer: 'Skipped', 
-                                answeredAt: new Date().toISOString() 
-                            }] 
+                            situationResponses: [] 
                         });
+                        
+                        // Mark onboarding as complete - sets local isOnboarded flag
+                        await completeOnboarding();
+                        
                         // Navigation will automatically switch to Main due to auth state change
                     },
                 },
