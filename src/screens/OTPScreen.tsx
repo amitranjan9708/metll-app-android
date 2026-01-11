@@ -91,10 +91,10 @@ export const OTPScreen: React.FC = () => {
       console.log('📱 Backend user data after OTP:', backendUser);
 
       // Check if user has completed onboarding based on backend data
-      // User is onboarded if they have situationResponses AND a profile photo
-      // Note: isVerified means phone verified, NOT onboarding complete
+      // User is onboarded if they have situationResponses OR a profile photo
+      // Note: isVerified means phone verified, NOT onboarding complete - don't use it here!
       const hasCompletedOnboarding = !!(
-        (backendUser.situationResponses && backendUser.situationResponses.length > 0) &&
+        (backendUser.situationResponses && backendUser.situationResponses.length > 0) ||
         backendUser.photo
       );
 
