@@ -50,6 +50,27 @@ class SocketService {
         this.socket.on('message_notification', (data) => {
             this.notify('message_notification', data);
         });
+
+        // Call event handlers
+        this.socket.on('incoming_call', (data) => {
+            console.log('📞 Incoming call received:', data);
+            this.notify('incoming_call', data);
+        });
+
+        this.socket.on('call_answered', (data) => {
+            console.log('📞 Call answered:', data);
+            this.notify('call_answered', data);
+        });
+
+        this.socket.on('call_ended', (data) => {
+            console.log('📞 Call ended:', data);
+            this.notify('call_ended', data);
+        });
+
+        this.socket.on('call_declined', (data) => {
+            console.log('📞 Call declined:', data);
+            this.notify('call_declined', data);
+        });
     }
 
     // Disconnect socket
