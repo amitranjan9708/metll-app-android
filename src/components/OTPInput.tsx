@@ -56,7 +56,8 @@ export const OTPInput: React.FC<OTPInputProps> = ({
   }, [focusedIndex]);
 
   const handleChange = (text: string, index: number) => {
-    const newValue = value.split('');
+    // Ensure we have a properly sized array with empty strings for unfilled slots
+    const newValue = Array.from({ length }, (_, i) => value[i] || '');
     newValue[index] = text;
     const joined = newValue.join('');
     onChange(joined);

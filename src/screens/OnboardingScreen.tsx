@@ -11,6 +11,7 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
@@ -42,6 +43,7 @@ const STEP_CONFIG = {
 export const OnboardingScreen: React.FC = () => {
   const theme = useTheme();
   const styles = getStyles(theme);
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { user, updateUser } = useAuth();
   const [step, setStep] = useState<OnboardingStep>('photo');
@@ -209,10 +211,8 @@ export const OnboardingScreen: React.FC = () => {
         homeLocation,
       });
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'PhotoUpload' }],
-      });
+      // Navigate to next step in onboarding flow
+      navigation.navigate('PhotoUpload');
     } catch (error) {
       Alert.alert('Error', 'Failed to save profile. Please try again.');
     }
@@ -363,7 +363,7 @@ export const OnboardingScreen: React.FC = () => {
 
   return (
     <LinearGradient colors={theme.gradients.background.colors as [string, string, string]} style={styles.container}>
-      <View style={styles.progressBarContainer}>
+      <View style={[styles.progressBarContainer, { paddingTop: insets.top + theme.spacing.md }]}>
         <View style={styles.progressBarBg}>
           <LinearGradient
             colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}

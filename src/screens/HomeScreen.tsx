@@ -8,9 +8,7 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from '../components/Button';
@@ -18,17 +16,37 @@ import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { theme } from '../theme';
 import { useAuth } from '../context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 type ConfessionType = 'school' | 'college' | 'office' | 'home';
 
 const CONFESSION_CARDS = [
-  { type: 'school' as const, icon: 'school', title: 'School', subtitle: 'School crush', color: '#4A5FA8' },
-  { type: 'college' as const, icon: 'library', title: 'College', subtitle: 'College crush', color: '#6B7FBF' },
-  { type: 'office' as const, icon: 'business', title: 'Office', subtitle: 'Work crush', color: '#E8A4B8' },
-  { type: 'home' as const, icon: 'home', title: 'Nearby', subtitle: 'Local crush', color: '#E05C5C' },
+  {
+    type: 'college' as const,
+    icon: 'school-outline',
+    title: 'College',
+    subtitle: 'Campus connections',
+  },
+  {
+    type: 'school' as const,
+    icon: 'book-outline',
+    title: 'School',
+    subtitle: 'Classmate crushes',
+  },
+  {
+    type: 'office' as const,
+    icon: 'briefcase-outline',
+    title: 'Office',
+    subtitle: 'Workplace sparks',
+  },
+  {
+    type: 'home' as const,
+    icon: 'location-outline',
+    title: 'Nearby',
+    subtitle: 'Local connections',
+  },
 ];
 
 export const HomeScreen: React.FC = () => {
@@ -40,36 +58,26 @@ export const HomeScreen: React.FC = () => {
   const [showMatchingPhotos, setShowMatchingPhotos] = useState(false);
 
   const [crushSchoolName, setCrushSchoolName] = useState('');
-  const [crushSchoolLocation, setCrushSchoolLocation] = useState('');
   const [crushSchoolCity, setCrushSchoolCity] = useState('');
-  const [crushSchoolState, setCrushSchoolState] = useState('');
   const [crushSchoolClass, setCrushSchoolClass] = useState('');
-  const [crushSchoolSection, setCrushSchoolSection] = useState('');
 
   const [crushCollegeName, setCrushCollegeName] = useState('');
   const [crushCollegeDepartment, setCrushCollegeDepartment] = useState('');
-  const [crushCollegeLocation, setCrushCollegeLocation] = useState('');
 
   const [crushOfficeName, setCrushOfficeName] = useState('');
   const [crushOfficeLocation, setCrushOfficeLocation] = useState('');
-  const [crushOfficeDepartment, setCrushOfficeDepartment] = useState('');
-  const [crushOfficeDesignation, setCrushOfficeDesignation] = useState('');
 
-  const [crushHomeLocation, setCrushHomeLocation] = useState('');
   const [crushHomeCity, setCrushHomeCity] = useState('');
-  const [crushHomeState, setCrushHomeState] = useState('');
+  const [crushHomeLocation, setCrushHomeLocation] = useState('');
 
   const [selectedCrushId, setSelectedCrushId] = useState<string | null>(null);
   const cardAnims = useRef(CONFESSION_CARDS.map(() => new Animated.Value(0))).current;
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const statsCardOpacity = useRef(new Animated.Value(1)).current;
-  const statsCardTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     CONFESSION_CARDS.forEach((_, index) => {
       Animated.spring(cardAnims[index], {
         toValue: 1,
-        delay: index * 80,
+        delay: index * 60,
         friction: 8,
         tension: 50,
         useNativeDriver: true,
@@ -77,51 +85,10 @@ export const HomeScreen: React.FC = () => {
     });
   }, []);
 
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    {
-      useNativeDriver: false,
-      listener: (event: any) => {
-        const offsetY = event.nativeEvent.contentOffset.y;
-        // Hide stats card when scrolling up (above threshold)
-        const threshold = 50;
-        if (offsetY > threshold) {
-          // Fade out and move up
-          Animated.parallel([
-            Animated.timing(statsCardOpacity, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(statsCardTranslateY, {
-              toValue: -20,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        } else {
-          // Fade in and move back
-          Animated.parallel([
-            Animated.timing(statsCardOpacity, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(statsCardTranslateY, {
-              toValue: 0,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-      },
-    }
-  );
-
   const mockMatchingUsers = [
-    { id: '1', name: 'Alex', photo: null, matchScore: 95 },
-    { id: '2', name: 'Sam', photo: null, matchScore: 88 },
-    { id: '3', name: 'Jordan', photo: null, matchScore: 82 },
+    { id: '1', name: 'Alex', matchScore: 95 },
+    { id: '2', name: 'Sam', matchScore: 88 },
+    { id: '3', name: 'Jordan', matchScore: 82 },
   ];
 
   const handleConfessionTypeSelect = (type: ConfessionType) => {
@@ -131,7 +98,6 @@ export const HomeScreen: React.FC = () => {
 
   const validateCrushDetails = (): boolean => {
     if (!confessionType) return false;
-
     switch (confessionType) {
       case 'school':
         if (!crushSchoolName || !crushSchoolCity) {
@@ -178,56 +144,55 @@ export const HomeScreen: React.FC = () => {
     setShowCrushDetails(false);
     setShowMatchingPhotos(false);
     setSelectedCrushId(null);
-    setCrushSchoolName(''); setCrushSchoolLocation(''); setCrushSchoolCity(''); setCrushSchoolState(''); setCrushSchoolClass(''); setCrushSchoolSection('');
-    setCrushCollegeName(''); setCrushCollegeDepartment(''); setCrushCollegeLocation('');
-    setCrushOfficeName(''); setCrushOfficeLocation(''); setCrushOfficeDepartment(''); setCrushOfficeDesignation('');
-    setCrushHomeLocation(''); setCrushHomeCity(''); setCrushHomeState('');
+    setCrushSchoolName(''); setCrushSchoolCity(''); setCrushSchoolClass('');
+    setCrushCollegeName(''); setCrushCollegeDepartment('');
+    setCrushOfficeName(''); setCrushOfficeLocation('');
+    setCrushHomeLocation(''); setCrushHomeCity('');
   };
 
   const handleSubmitConfession = async (crushId?: string) => {
     if (!confessionType) return;
     Alert.alert(
-      'Confession Saved! 💕',
+      'Sent! 💫',
       crushId
-        ? 'Your confession has been saved. If they confess about you too, you\'ll get a match!'
-        : 'Your confession has been saved. We\'ll notify you if someone matches!',
-      [{ text: 'OK', onPress: resetForm }]
+        ? 'If they feel the same, you\'ll match!'
+        : 'We\'ll notify you when someone matches.',
+      [{ text: 'Done', onPress: resetForm }]
     );
   };
 
   const renderCrushDetailsForm = () => {
     if (!confessionType) return null;
-
     switch (confessionType) {
       case 'school':
         return (
           <>
-            <Input label="School Name *" placeholder="Their school" value={crushSchoolName} onChangeText={setCrushSchoolName} />
+            <Input label="School Name" placeholder="Where do they study?" value={crushSchoolName} onChangeText={setCrushSchoolName} />
             <View style={styles.row}>
-              <View style={styles.halfInput}><Input label="City *" placeholder="City" value={crushSchoolCity} onChangeText={setCrushSchoolCity} /></View>
-              <View style={styles.halfInput}><Input label="Class" placeholder="e.g., 12th" value={crushSchoolClass} onChangeText={setCrushSchoolClass} /></View>
+              <View style={styles.halfInput}><Input label="City" placeholder="City" value={crushSchoolCity} onChangeText={setCrushSchoolCity} /></View>
+              <View style={styles.halfInput}><Input label="Class" placeholder="e.g. 12th" value={crushSchoolClass} onChangeText={setCrushSchoolClass} /></View>
             </View>
           </>
         );
       case 'college':
         return (
           <>
-            <Input label="College Name *" placeholder="Their college" value={crushCollegeName} onChangeText={setCrushCollegeName} />
-            <Input label="Department *" placeholder="Their department" value={crushCollegeDepartment} onChangeText={setCrushCollegeDepartment} />
+            <Input label="College Name" placeholder="Where do they study?" value={crushCollegeName} onChangeText={setCrushCollegeName} />
+            <Input label="Department" placeholder="Their department" value={crushCollegeDepartment} onChangeText={setCrushCollegeDepartment} />
           </>
         );
       case 'office':
         return (
           <>
-            <Input label="Company *" placeholder="Their company" value={crushOfficeName} onChangeText={setCrushOfficeName} />
-            <Input label="Location *" placeholder="Office location" value={crushOfficeLocation} onChangeText={setCrushOfficeLocation} />
+            <Input label="Company" placeholder="Where do they work?" value={crushOfficeName} onChangeText={setCrushOfficeName} />
+            <Input label="Location" placeholder="Office location" value={crushOfficeLocation} onChangeText={setCrushOfficeLocation} />
           </>
         );
       case 'home':
         return (
           <>
-            <Input label="City *" placeholder="Their city" value={crushHomeCity} onChangeText={setCrushHomeCity} />
-            <Input label="Area" placeholder="Neighborhood" value={crushHomeLocation} onChangeText={setCrushHomeLocation} />
+            <Input label="City" placeholder="Their city" value={crushHomeCity} onChangeText={setCrushHomeCity} />
+            <Input label="Area" placeholder="Neighborhood (optional)" value={crushHomeLocation} onChangeText={setCrushHomeLocation} />
           </>
         );
       default:
@@ -235,427 +200,561 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
+  // Matching photos screen - minimal style
   if (showMatchingPhotos) {
     return (
-      <LinearGradient colors={theme.gradients.background.colors as [string, string, string]} style={styles.container}>
-        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => setShowMatchingPhotos(false)} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={22} color={theme.colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Select Your Crush</Text>
-            <View style={{ width: 36 }} />
-          </View>
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <TouchableOpacity onPress={() => setShowMatchingPhotos(false)} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Select Your Crush</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
+        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.matchSubtitle}>{mockMatchingUsers.length} people found</Text>
 
-          <View style={styles.photosGrid}>
+          <View style={styles.peopleList}>
             {mockMatchingUsers.map((person) => (
               <TouchableOpacity
                 key={person.id}
-                style={[styles.photoCard, selectedCrushId === person.id && styles.photoCardSelected]}
+                style={[styles.personCard, selectedCrushId === person.id && styles.personCardSelected]}
                 onPress={() => handleSelectCrush(person.id)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <View style={styles.photoPlaceholder}>
-                  <Ionicons name="person" size={36} color={theme.colors.primary} />
+                <View style={styles.personAvatar}>
+                  <Ionicons name="person" size={28} color="#6B6B6B" />
                 </View>
-                <Text style={styles.photoName}>{person.name}</Text>
-                <View style={styles.matchBadge}>
-                  <Text style={styles.matchScore}>{person.matchScore}%</Text>
+                <View style={styles.personInfo}>
+                  <Text style={styles.personName}>{person.name}</Text>
+                  <Text style={styles.personMatch}>{person.matchScore}% match</Text>
                 </View>
+                <Ionicons
+                  name={selectedCrushId === person.id ? "checkmark-circle" : "chevron-forward"}
+                  size={24}
+                  color={selectedCrushId === person.id ? "#E07A5F" : "#9B9B9B"}
+                />
               </TouchableOpacity>
             ))}
           </View>
 
-          <Button title="Skip Selection" onPress={handleSkipSelection} variant="outline" style={styles.skipBtn} />
+          <TouchableOpacity onPress={handleSkipSelection} style={styles.skipLink}>
+            <Text style={styles.skipText}>Skip for now</Text>
+          </TouchableOpacity>
         </ScrollView>
-      </LinearGradient>
+      </View>
     );
   }
 
+  // Crush details form - clean, minimal
   if (showCrushDetails) {
+    const currentCard = CONFESSION_CARDS.find(c => c.type === confessionType);
     return (
-      <LinearGradient colors={theme.gradients.background.colors as [string, string, string]} style={styles.container}>
-        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => setShowCrushDetails(false)} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={22} color={theme.colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Crush Details</Text>
-            <View style={{ width: 36 }} />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <TouchableOpacity onPress={() => setShowCrushDetails(false)} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Add Details</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView style={styles.flex} contentContainerStyle={styles.formScrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.formTypeIndicator}>
+            <View style={styles.formTypeIcon}>
+              <Ionicons name={currentCard?.icon as any} size={24} color="#1A1A1A" />
+            </View>
+            <Text style={styles.formTypeText}>{currentCard?.title} Crush</Text>
           </View>
 
-          <Card style={styles.formCard}>
-            <View style={styles.formHeader}>
-              <View style={[styles.formIconBg, { backgroundColor: CONFESSION_CARDS.find(c => c.type === confessionType)?.color + '20' }]}>
-                <Ionicons name={CONFESSION_CARDS.find(c => c.type === confessionType)?.icon as any} size={24} color={CONFESSION_CARDS.find(c => c.type === confessionType)?.color} />
-              </View>
-              <Text style={styles.formTitle}>{CONFESSION_CARDS.find(c => c.type === confessionType)?.title} Crush</Text>
-            </View>
+          <Text style={styles.formDescription}>
+            Tell us a bit about where you know them from
+          </Text>
+
+          <View style={styles.formFields}>
             {renderCrushDetailsForm()}
-            <Button title="Find Matches" onPress={handleSearchCrush} style={styles.searchBtn} />
-          </Card>
+          </View>
+
+          <Button title="Find Matches" onPress={handleSearchCrush} style={styles.findBtn} />
         </ScrollView>
-      </LinearGradient>
+      </View>
     );
   }
 
+  // Main home screen - Hinge-inspired minimal design
   return (
-    <LinearGradient colors={theme.gradients.background.colors as [string, string, string]} style={styles.container}>
-      {/* Top Header - Welcome text and Icons */}
-      <View style={[styles.topHeader, { top: insets.top + 10 }]}>
-        <View style={styles.welcomeTextContainer}>
-          <Text style={styles.welcomeText}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={[styles.mainHeader, { paddingTop: insets.top + 16 }]}>
+        <View>
+          <Text style={styles.greeting}>Hey, {user?.name?.split(' ')[0]} 👋</Text>
+          <Text style={styles.subGreeting}>Who's on your mind?</Text>
         </View>
-        <View style={styles.topRightContainer}>
-          <TouchableOpacity style={styles.notifBtn}>
-            <Ionicons name="notifications-outline" size={22} color="#8E8E93" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => navigation.navigate('Settings' as never)}
-            activeOpacity={0.8}
-          >
-            {user?.photo ? (
-              <Image source={{ uri: user.photo }} style={styles.profileImage} />
-            ) : (
-              <View style={styles.profilePlaceholder}>
-                <Ionicons name="person-outline" size={20} color="#8E8E93" />
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => navigation.navigate('Settings' as never)}
+        >
+          <Ionicons name="person-circle-outline" size={32} color="#1A1A1A" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.flex} 
-        contentContainerStyle={styles.scrollContent} 
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.mainScrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
       >
-        {/* Subtitle */}
-        <Text style={styles.welcomeSubtext}>Who's your crush today?</Text>
+        {/* Confession Cards */}
+        <Text style={styles.sectionTitle}>Make a confession</Text>
 
-        {/* Stats Card */}
-        <Animated.View
-          style={[
-            styles.statsCardContainer,
-            {
-              opacity: statsCardOpacity,
-              transform: [{ translateY: statsCardTranslateY }],
-            },
-          ]}
-        >
-          <Card style={styles.statsCard}>
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Ionicons name="heart" size={20} color={theme.colors.heart} />
-              <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>Matches</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Ionicons name="chatbubble" size={20} color={theme.colors.accent} />
-              <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>Confessions</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Ionicons name="eye" size={20} color={theme.colors.primary} />
-              <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>Views</Text>
-            </View>
-          </View>
-        </Card>
-        </Animated.View>
-
-        {/* Section Title */}
-        <Text style={styles.sectionTitle}>Confess about your crush</Text>
-
-        {/* Confession Cards Grid */}
-        <View style={styles.cardsGrid}>
-          {CONFESSION_CARDS.map((card, index) => (
-            <Animated.View
-              key={card.type}
-              style={[styles.confessionCardWrapper, {
-                opacity: cardAnims[index],
-                transform: [{ scale: cardAnims[index].interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
-              }]}
+        {CONFESSION_CARDS.map((card, index) => (
+          <Animated.View
+            key={card.type}
+            style={{
+              opacity: cardAnims[index],
+              transform: [{
+                translateY: cardAnims[index].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0]
+                })
+              }],
+            }}
+          >
+            <TouchableOpacity
+              style={styles.confessionCard}
+              onPress={() => handleConfessionTypeSelect(card.type)}
+              activeOpacity={0.7}
             >
-              <TouchableOpacity style={styles.confessionCard} onPress={() => handleConfessionTypeSelect(card.type)} activeOpacity={0.85}>
-                <View style={[styles.cardIconBg, { backgroundColor: card.color + '15' }]}>
-                  <Ionicons name={card.icon as any} size={26} color={card.color} />
-                </View>
+              <View style={styles.cardIcon}>
+                <Ionicons name={card.icon as any} size={24} color="#1A1A1A" />
+              </View>
+              <View style={styles.cardText}>
                 <Text style={styles.cardTitle}>{card.title}</Text>
                 <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
-        </View>
-
-        {/* Live Match Card */}
-        <TouchableOpacity 
-          style={styles.liveMatchCard} 
-          onPress={() => navigation.navigate('LiveMatching' as never)} 
-          activeOpacity={0.9}
-        >
-          <LinearGradient 
-            colors={theme.gradients.primary.colors as [string, string]} 
-            style={styles.liveMatchCardGradient} 
-            start={{ x: 0, y: 0 }} 
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.liveMatchContent}>
-              <View style={styles.liveMatchLeft}>
-                <View style={styles.liveMatchIconContainer}>
-                  <Ionicons name="location" size={32} color={theme.colors.white} />
-                </View>
-                <Text style={styles.liveMatchTitle}>Live Matching</Text>
-                <Text style={styles.liveMatchSubtitle}>Find people nearby in real-time</Text>
-                <View style={styles.liveMatchStats}>
-                  <View style={styles.liveMatchStatItem}>
-                    <Ionicons name="people" size={16} color={theme.colors.white} />
-                    <Text style={styles.liveMatchStatText}>12 nearby</Text>
-                  </View>
-                  <View style={styles.liveMatchStatItem}>
-                    <Ionicons name="radio" size={16} color={theme.colors.white} />
-                    <Text style={styles.liveMatchStatText}>100m radius</Text>
-                  </View>
-                </View>
               </View>
-              <View style={styles.liveMatchRight}>
-                <View style={styles.liveMatchIllustration}>
-                  {/* Map illustration with dots */}
-                  <View style={styles.mapContainer}>
-                    <View style={styles.mapCircle} />
-                    <View style={[styles.mapDot, { top: 20, left: 30 }]} />
-                    <View style={[styles.mapDot, { top: 50, left: 60 }]} />
-                    <View style={[styles.mapDot, { top: 35, left: 80 }]} />
-                    <View style={[styles.mapDot, { top: 60, left: 40 }]} />
-                    <View style={styles.mapCenter}>
-                      <Ionicons name="person" size={16} color={theme.colors.white} />
-                    </View>
-                  </View>
+              <Ionicons name="chevron-forward" size={22} color="#9B9B9B" />
+            </TouchableOpacity>
+          </Animated.View>
+        ))}
+
+        {/* Live Feature Card - Modern Gradient Design */}
+        <TouchableOpacity
+          style={styles.liveCard}
+          onPress={() => navigation.navigate('LiveMatching' as never)}
+          activeOpacity={0.85}
+        >
+          {/* Gradient Background Layers */}
+          <View style={styles.liveGradientBase} />
+          <View style={styles.liveGradientOverlay} />
+
+          {/* Decorative Circles */}
+          <View style={styles.liveDecorCircle1} />
+          <View style={styles.liveDecorCircle2} />
+          <View style={styles.liveDecorCircle3} />
+
+          <View style={styles.liveCardInner}>
+            {/* Left Content */}
+            <View style={styles.liveCardContent}>
+              {/* Live Badge with Pulse */}
+              <View style={styles.liveBadge}>
+                <View style={styles.livePulseOuter}>
+                  <View style={styles.livePulseInner} />
+                  <View style={styles.liveDot} />
                 </View>
-                <Ionicons name="arrow-forward-circle" size={32} color={theme.colors.white} style={styles.liveMatchArrow} />
+                <Text style={styles.liveText}>LIVE NOW</Text>
+              </View>
+
+              {/* Main Text */}
+              <Text style={styles.liveTitle}>Discover Nearby</Text>
+              <Text style={styles.liveSubtitle}>Find people close to you right now</Text>
+
+              {/* Stats Row */}
+              <View style={styles.liveStatsRow}>
+                <View style={styles.liveStat}>
+                  <MaterialCommunityIcons name="account-group" size={14} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.liveStatText}>12 nearby</Text>
+                </View>
+                <View style={styles.liveStatDivider} />
+                <View style={styles.liveStat}>
+                  <Ionicons name="location" size={12} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.liveStatText}>5km radius</Text>
+                </View>
               </View>
             </View>
-          </LinearGradient>
+
+            {/* Right Side - Radar Icon */}
+            <View style={styles.liveRadarContainer}>
+              <View style={styles.liveRadarRing1} />
+              <View style={styles.liveRadarRing2} />
+              <View style={styles.liveRadarCenter}>
+                <Ionicons name="navigate" size={24} color="#FFFFFF" />
+              </View>
+            </View>
+          </View>
+
+          {/* Arrow Indicator */}
+          <View style={styles.liveArrowContainer}>
+            <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.8)" />
+          </View>
         </TouchableOpacity>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 };
 
 const cardWidth = (width - 48 - 12) / 2;
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
   flex: { flex: 1 },
-  scrollContent: { padding: 16, paddingTop: 80 }, // Extra top padding for header
-  topHeader: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
+
+  // Header
+  mainHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 100,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    backgroundColor: '#FAFAFA',
   },
-  welcomeTextContainer: {
-    flex: 1,
+  greeting: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
   },
-  topRightContainer: {
+  subGreeting: {
+    fontSize: 15,
+    color: '#6B6B6B',
+    marginTop: 4,
+  },
+  profileBtn: {
+    padding: 4,
+  },
+
+  // Main content
+  mainScrollContent: {
+    padding: 24,
+    paddingTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9B9B9B',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
+
+  // Confession cards - minimal list style
+  confessionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
   },
-  notifBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-  profileButton: {
+  cardIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  cardText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    marginTop: 2,
+  },
+
+  // Live card - Modern Gradient Design
+  liveCard: {
+    position: 'relative',
     overflow: 'hidden',
-    ...theme.shadows.md,
-    borderWidth: 2,
-    borderColor: theme.colors.white,
+    borderRadius: 24,
+    marginTop: 28,
+    minHeight: 160,
   },
-  profileImage: {
-    width: '100%',
-    height: '100%',
+  liveGradientBase: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#667EEA',
   },
-  profilePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: theme.colors.white,
+  liveGradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#764BA2',
+    opacity: 0.6,
+  },
+  liveDecorCircle1: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  liveDecorCircle2: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  liveDecorCircle3: {
+    position: 'absolute',
+    top: 20,
+    left: 60,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  liveCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 1,
+  },
+  liveCardContent: {
+    flex: 1,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  livePulseOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  livePulseInner: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4ADE80',
+  },
+  liveText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 1.5,
+  },
+  liveTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  liveSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 12,
+  },
+  liveStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  liveStatText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+  },
+  liveStatDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 12,
+  },
+  liveRadarContainer: {
+    width: 72,
+    height: 72,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center', ...theme.shadows.sm },
-  headerTitle: { ...theme.typography.subheading, color: theme.colors.textPrimary },
-
-  welcomeText: { ...theme.typography.subheading, color: theme.colors.textPrimary },
-  welcomeSubtext: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: 8, marginBottom: 16 },
-
-  statsCardContainer: {
-    marginBottom: 20,
+  liveRadarRing1: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
-  statsCard: { padding: 16 },
-  statsRow: { flexDirection: 'row', alignItems: 'center' },
-  statBox: { flex: 1, alignItems: 'center', gap: 4 },
-  statValue: { ...theme.typography.subheading, color: theme.colors.textPrimary },
-  statLabel: { ...theme.typography.caption, color: theme.colors.textSecondary },
-  statDivider: { width: 1, height: 40, backgroundColor: theme.colors.border },
-
-  sectionTitle: { ...theme.typography.bodyBold, color: theme.colors.textPrimary, marginTop: 24, marginBottom: 12 },
-
-  cardsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
-  confessionCardWrapper: { width: cardWidth },
-  confessionCard: { backgroundColor: theme.colors.white, borderRadius: 16, padding: 16, alignItems: 'center', ...theme.shadows.sm, borderWidth: 1, borderColor: theme.colors.border },
-  cardIconBg: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  cardTitle: { ...theme.typography.bodyBold, color: theme.colors.textPrimary },
-  cardSubtitle: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2 },
-
-  liveMatchCard: { 
-    marginTop: 34, 
-    borderRadius: 20, 
-    overflow: 'hidden', 
-    ...theme.shadows.lg,
-    marginBottom: 20,
-    width: '100%',
+  liveRadarRing2: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  liveMatchCardGradient: { 
-    padding: 20,
-    minHeight: 180,
-    width: '100%',
-  },
-  liveMatchContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  liveRadarCenter: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
   },
-  liveMatchLeft: {
-    flex: 1,
-    gap: 8,
+  liveArrowContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  liveMatchIconContainer: {
+
+  // Form header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: '#FAFAFA',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+
+  // Form content
+  scrollContent: {
+    padding: 24,
+  },
+  formScrollContent: {
+    padding: 24,
+    paddingTop: 16,
+  },
+  formTypeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  formTypeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  formTypeText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  formDescription: {
+    fontSize: 15,
+    color: '#6B6B6B',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  formFields: {
+    marginBottom: 24,
+  },
+  row: { flexDirection: 'row', gap: 12 },
+  halfInput: { flex: 1 },
+  findBtn: { marginTop: 8 },
+
+  // Match selection
+  matchSubtitle: {
+    fontSize: 15,
+    color: '#6B6B6B',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  peopleList: {
+    gap: 12,
+  },
+  personCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  personCardSelected: {
+    borderColor: '#E07A5F',
+    backgroundColor: 'rgba(224, 122, 95, 0.04)',
+  },
+  personAvatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginRight: 16,
   },
-  liveMatchTitle: {
-    ...theme.typography.subheading,
-    fontSize: 20,
-    color: theme.colors.white,
+  personInfo: {
+    flex: 1,
+  },
+  personName: {
+    fontSize: 17,
     fontWeight: '600',
+    color: '#1A1A1A',
   },
-  liveMatchSubtitle: {
-    ...theme.typography.body,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 12,
+  personMatch: {
+    fontSize: 14,
+    color: '#E07A5F',
+    marginTop: 2,
   },
-  liveMatchStats: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 4,
-  },
-  liveMatchStatItem: {
-    flexDirection: 'row',
+  skipLink: {
     alignItems: 'center',
-    gap: 6,
+    paddingVertical: 20,
   },
-  liveMatchStatText: {
-    ...theme.typography.caption,
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: 12,
+  skipText: {
+    fontSize: 15,
+    color: '#6B6B6B',
+    textDecorationLine: 'underline',
   },
-  liveMatchRight: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 16,
-  },
-  liveMatchIllustration: {
-    width: 120,
-    height: 120,
-    position: 'relative',
-    marginBottom: 8,
-  },
-  mapContainer: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    position: 'relative',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  mapCircle: {
-    position: 'absolute',
-    width: '80%',
-    height: '80%',
-    top: '10%',
-    left: '10%',
-    borderRadius: 60,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderStyle: 'dashed',
-  },
-  mapDot: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.white,
-    ...theme.shadows.sm,
-  },
-  mapCenter: {
-    position: 'absolute',
-    top: 48,
-    left: 48,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.white,
-  },
-  liveMatchArrow: {
-    opacity: 0.9,
-  },
-
-  formCard: { marginTop: 8 },
-  formHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  formIconBg: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  formTitle: { ...theme.typography.subheading, color: theme.colors.textPrimary },
-  row: { flexDirection: 'row', gap: 10 },
-  halfInput: { flex: 1 },
-  searchBtn: { marginTop: 12 },
-
-  matchSubtitle: { ...theme.typography.body, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 16 },
-  photosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
-  photoCard: { width: cardWidth, backgroundColor: theme.colors.white, borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 2, borderColor: theme.colors.border, ...theme.shadows.sm },
-  photoCardSelected: { borderColor: theme.colors.primary },
-  photoPlaceholder: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.primaryLight + '30', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  photoName: { ...theme.typography.bodyBold, color: theme.colors.textPrimary },
-  matchBadge: { backgroundColor: theme.colors.primary + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginTop: 6 },
-  matchScore: { ...theme.typography.caption, color: theme.colors.primary, fontWeight: '600' },
-  skipBtn: { marginTop: 8 },
 });

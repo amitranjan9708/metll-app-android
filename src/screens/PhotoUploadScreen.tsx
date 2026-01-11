@@ -10,6 +10,7 @@ import {
     Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from '../components/Button';
@@ -27,6 +28,7 @@ type ScreenStep = 'photos' | 'video';
 export const PhotoUploadScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const theme = useTheme();
+    const insets = useSafeAreaInsets();
     const { updateUser } = useAuth();
 
     // Screen step: photos first, then video
@@ -136,7 +138,7 @@ export const PhotoUploadScreen: React.FC = () => {
                 colors={[theme.colors.background, theme.colors.backgroundLight]}
                 style={styles.container}
             >
-                <View style={styles.videoHeader}>
+                <View style={[styles.videoHeader, { paddingTop: insets.top + theme.spacing.md }]}>
                     <TouchableOpacity style={styles.backBtn} onPress={handleVideoCancel}>
                         <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
                     </TouchableOpacity>
@@ -177,7 +179,7 @@ export const PhotoUploadScreen: React.FC = () => {
             colors={[theme.colors.background, theme.colors.backgroundLight]}
             style={styles.container}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + theme.spacing.lg }]}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Add Your Best Photos</Text>
                     <Text style={styles.subtitle}>
@@ -282,7 +284,6 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     },
     scrollContent: {
         padding: theme.spacing.lg,
-        paddingTop: 60,
     },
     header: {
         marginBottom: theme.spacing.xl,
@@ -426,7 +427,6 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 50,
         paddingHorizontal: theme.spacing.lg,
         paddingBottom: theme.spacing.md,
     },

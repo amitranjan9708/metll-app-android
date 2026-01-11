@@ -12,6 +12,7 @@ import {
     Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -38,6 +39,7 @@ const CATEGORY_COLORS: Record<SituationCategory, string> = {
 export const SituationAnswerScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<RouteParams, 'SituationAnswer'>>();
+    const insets = useSafeAreaInsets();
     const { updateUser } = useAuth();
 
     const { selectedQuestions } = route.params;
@@ -142,12 +144,8 @@ export const SituationAnswerScreen: React.FC = () => {
 
         try {
             await updateUser({ situationResponses: responses });
-
-            // Navigate to Main screen
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-            });
+            // Navigation will automatically switch to Main app due to auth state change
+            // (user now has situation responses, so needsOnboarding becomes false)
         } catch (error) {
             Alert.alert('Error', 'Failed to save your answers. Please try again.');
         }
@@ -166,7 +164,7 @@ export const SituationAnswerScreen: React.FC = () => {
                 style={styles.gradient}
             >
                 {/* Header */}
-                <View style={styles.header}>
+                <View style={[styles.header, { paddingTop: insets.top + theme.spacing.md }]}>
                     <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
                         <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
                     </TouchableOpacity>
@@ -307,7 +305,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 50,
         paddingHorizontal: theme.spacing.lg,
         paddingBottom: theme.spacing.md,
     },

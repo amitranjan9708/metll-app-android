@@ -9,16 +9,22 @@ import {
     Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { theme } from '../theme';
+import { useTheme } from '../theme/useTheme';
+import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 export const SituationIntroScreen: React.FC = () => {
     const navigation = useNavigation<any>();
+    const theme = useTheme();
+    const insets = useSafeAreaInsets();
+    const styles = getStyles(theme);
+    const { updateUser } = useAuth();
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -93,7 +99,17 @@ export const SituationIntroScreen: React.FC = () => {
                 {
                     text: 'Skip for Now',
                     style: 'destructive',
-                    onPress: () => navigation.navigate('Main'),
+                    onPress: async () => {
+                        // Mark onboarding as complete with a skipped marker
+                        await updateUser({ 
+                            situationResponses: [{ 
+                                questionId: -1, 
+                                answer: 'Skipped', 
+                                answeredAt: new Date().toISOString() 
+                            }] 
+                        });
+                        // Navigation will automatically switch to Main due to auth state change
+                    },
                 },
             ]
         );
@@ -102,7 +118,7 @@ export const SituationIntroScreen: React.FC = () => {
     return (
         <LinearGradient
             colors={[theme.colors.background, theme.colors.backgroundLight, theme.colors.background]}
-            style={styles.container}
+            style={[styles.container, { paddingTop: insets.top + theme.spacing.lg }]}
         >
             {/* Progress Indicator */}
             <View style={styles.progressContainer}>
@@ -195,10 +211,9 @@ export const SituationIntroScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: 60,
         paddingHorizontal: theme.spacing.lg,
     },
     progressContainer: {

@@ -2,18 +2,18 @@ import { fontFamily } from './fonts';
 
 export const typography = {
   heading: {
-    fontFamily: fontFamily.novaklasse,
+    fontFamily: fontFamily.system,
     fontSize: 26,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
     lineHeight: 32,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   subheading: {
-    fontFamily: fontFamily.novaklasse,
+    fontFamily: fontFamily.system,
     fontSize: 18,
     fontWeight: '600' as const,
     lineHeight: 24,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   body: {
     fontFamily: fontFamily.system,
@@ -22,7 +22,7 @@ export const typography = {
     lineHeight: 20,
   },
   bodyBold: {
-    fontFamily: fontFamily.novaklasse,
+    fontFamily: fontFamily.system,
     fontSize: 14,
     fontWeight: '600' as const,
     lineHeight: 20,
@@ -34,7 +34,7 @@ export const typography = {
     lineHeight: 16,
   },
   button: {
-    fontFamily: fontFamily.novaklasse,
+    fontFamily: fontFamily.system,
     fontSize: 15,
     fontWeight: '600' as const,
     lineHeight: 20,

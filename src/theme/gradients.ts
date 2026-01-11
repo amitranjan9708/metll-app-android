@@ -1,41 +1,43 @@
+// Minimal gradients - mostly flat with subtle depth
+
 export const gradients = {
     primary: {
-        colors: ['#5A6FA3', '#A4B8E7'],
+        colors: ['#1F1F1F', '#2D2D2D'],
         start: { x: 0, y: 0 },
         end: { x: 1, y: 1 },
     },
     primaryVertical: {
-        colors: ['#5A6FA3', '#A4B8E7'],
+        colors: ['#1F1F1F', '#2D2D2D'],
         start: { x: 0, y: 0 },
         end: { x: 0, y: 1 },
     },
     secondary: {
-        colors: ['#5A6FA3', '#A4B8E7'],
+        colors: ['#F5F5F5', '#FFFFFF'],
         start: { x: 0, y: 0 },
         end: { x: 1, y: 1 },
     },
     background: {
-        colors: ['#A4B8E7', '#DDE5F8', '#EEF2FC'],
+        colors: ['#FFFFFF', '#FAFAFA', '#F5F5F5'],
         start: { x: 0, y: 0 },
         end: { x: 0, y: 1 },
     },
     romantic: {
-        colors: ['#5A6FA3', '#A4B8E7'],
+        colors: ['#E07A5F', '#E8967E'],
         start: { x: 0, y: 0 },
         end: { x: 1, y: 1 },
     },
     card: {
-        colors: ['rgba(138, 163, 232, 0.08)', 'rgba(232, 164, 184, 0.04)'],
+        colors: ['rgba(255, 255, 255, 1)', 'rgba(250, 250, 250, 1)'],
         start: { x: 0, y: 0 },
-        end: { x: 1, y: 1 },
+        end: { x: 0, y: 1 },
     },
     accent: {
-        colors: ['#E8A4B8', '#F5D0DC'],
+        colors: ['#E07A5F', '#E8967E'],
         start: { x: 0, y: 0 },
         end: { x: 1, y: 0 },
     },
     love: {
-        colors: ['#E05C5C', '#E8A4B8'],
+        colors: ['#E07A5F', '#D96A50'],
         start: { x: 0, y: 0 },
         end: { x: 1, y: 1 },
     },

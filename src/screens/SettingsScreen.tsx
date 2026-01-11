@@ -6,160 +6,222 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-import { Card } from '../components/Card';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
-import { ThemeSelector } from '../components/ThemeSelector';
-import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
-  const theme = useTheme();
-  const styles = getStyles(theme);
+  const insets = useSafeAreaInsets();
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Log out',
+      'Are you sure you want to log out?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Logout',
+          text: 'Log out',
           style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
+          onPress: async () => await logout(),
         },
       ]
     );
   };
 
-  const navigation = useNavigation();
-
   const settingsItems = [
-    { icon: 'person-outline', title: 'Edit Profile', onPress: () => Alert.alert('Coming Soon', 'Edit profile coming soon') },
-    { icon: 'diamond-outline', title: 'Subscription', onPress: () => navigation.navigate('Subscription' as never) },
-    { icon: 'notifications-outline', title: 'Notifications', onPress: () => Alert.alert('Coming Soon', 'Notification settings coming soon') },
-    { icon: 'lock-closed-outline', title: 'Privacy & Security', onPress: () => Alert.alert('Coming Soon', 'Privacy settings coming soon') },
-    { icon: 'location-outline', title: 'Location Settings', onPress: () => Alert.alert('Coming Soon', 'Location settings coming soon') },
-    { icon: 'help-circle-outline', title: 'Help & Support', onPress: () => Alert.alert('Coming Soon', 'Help & Support coming soon') },
-    { icon: 'document-text-outline', title: 'Terms & Privacy', onPress: () => Alert.alert('Coming Soon', 'Terms & Privacy coming soon') },
+    { icon: 'person-outline', title: 'Edit Profile' },
+    { icon: 'diamond-outline', title: 'Subscription' },
+    { icon: 'notifications-outline', title: 'Notifications' },
+    { icon: 'lock-closed-outline', title: 'Privacy & Security' },
+    { icon: 'help-circle-outline', title: 'Help & Support' },
+    { icon: 'document-text-outline', title: 'Terms & Privacy' },
   ];
 
   return (
-    <LinearGradient
-      colors={theme.gradients.background.colors as [string, string, string]}
-      style={styles.container}
-    >
-      <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <View style={styles.profileImageWrapper}>
-            <LinearGradient
-              colors={theme.gradients.romantic.colors as [string, string]}
-              style={styles.profileRing}
-            />
-            {user?.photo ? (
-              <Image source={{ uri: user.photo }} style={styles.profilePhoto} />
-            ) : (
-              <View style={styles.profilePhotoPlaceholder}>
-                <Ionicons name="person" size={40} color={theme.colors.primary} />
-              </View>
-            )}
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={36} color="#6B6B6B" />
           </View>
-          <Text style={styles.profileName}>{user?.name}</Text>
-          <Text style={styles.profileEmail}>{user?.email}</Text>
+          <Text style={styles.name}>{user?.name || 'User'}</Text>
+          <Text style={styles.email}>{user?.email || 'email@example.com'}</Text>
+        </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Ionicons name="heart" size={20} color={theme.colors.heart} />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Matches</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="chatbubble" size={20} color={theme.colors.accent} />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Confessions</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="sparkles" size={20} color={theme.colors.primary} />
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Likes</Text>
-            </View>
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Matches</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Confessions</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Likes</Text>
           </View>
         </View>
 
         {/* Settings List */}
-        <Card style={styles.settingsCard}>
-          <ThemeSelector />
-          <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.settingsList}>
           {settingsItems.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={[
-                styles.settingsItem,
-                index < settingsItems.length - 1 && styles.settingsItemBorder,
-              ]}
-              onPress={item.onPress}
-              activeOpacity={0.7}
+              style={styles.settingsItem}
+              onPress={() => Alert.alert('Coming Soon', `${item.title} coming soon`)}
+              activeOpacity={0.6}
             >
               <View style={styles.settingsItemLeft}>
-                <View style={styles.settingsIconWrapper}>
-                  <Ionicons name={item.icon as any} size={20} color={theme.colors.primary} />
-                </View>
+                <Ionicons name={item.icon as any} size={22} color="#1A1A1A" />
                 <Text style={styles.settingsItemText}>{item.title}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+              <Ionicons name="chevron-forward" size={20} color="#9B9B9B" />
             </TouchableOpacity>
           ))}
-        </Card>
+        </View>
 
-        {/* Logout Button */}
-        <Button
-          title="Logout"
-          onPress={handleLogout}
-          variant="outline"
-          icon={<Ionicons name="log-out-outline" size={20} color={theme.colors.primary} />}
-          style={styles.logoutButton}
-        />
+        {/* Logout */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color="#D64545" />
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
 
         {/* Version */}
-        <Text style={styles.versionText}>MetLL v1.0.0 💕</Text>
+        <Text style={styles.version}>Version 1.0.0</Text>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 };
 
-const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
-  container: { flex: 1 },
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
   flex: { flex: 1 },
-  scrollContent: { padding: theme.spacing.lg },
-  profileSection: { alignItems: 'center', marginBottom: theme.spacing.xl, paddingTop: theme.spacing.lg },
-  profileImageWrapper: { position: 'relative', marginBottom: theme.spacing.md },
-  profileRing: { position: 'absolute', width: 108, height: 108, borderRadius: 54, top: -4, left: -4 },
-  profilePhoto: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: theme.colors.white },
-  profilePhotoPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: theme.colors.backgroundCard, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: theme.colors.border, ...theme.shadows.md },
-  profileName: { ...theme.typography.heading, color: theme.colors.textPrimary, marginBottom: theme.spacing.xs },
-  profileEmail: { ...theme.typography.body, color: theme.colors.textSecondary, marginBottom: theme.spacing.lg },
-  statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.backgroundCard, borderRadius: theme.borderRadius.xl, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadows.sm },
-  statItem: { alignItems: 'center', flex: 1, gap: 4 },
-  statNumber: { ...theme.typography.subheading, color: theme.colors.textPrimary },
-  statLabel: { ...theme.typography.caption, color: theme.colors.textSecondary },
-  statDivider: { width: 1, height: 50, backgroundColor: theme.colors.border },
-  settingsCard: { marginBottom: theme.spacing.lg },
-  settingsItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: theme.spacing.md },
-  settingsItemBorder: { borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  settingsItemLeft: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
-  settingsIconWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primaryLight + '30', justifyContent: 'center', alignItems: 'center' },
-  settingsItemText: { ...theme.typography.body, color: theme.colors.textPrimary },
-  logoutButton: { marginTop: theme.spacing.md },
-  versionText: { ...theme.typography.caption, color: theme.colors.textSecondary, textAlign: 'center', marginTop: theme.spacing.xl, marginBottom: theme.spacing.lg },
-  divider: { height: 1, marginVertical: theme.spacing.sm },
+  scrollContent: {
+    padding: 24,
+  },
+
+  // Profile
+  profileSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  email: {
+    fontSize: 15,
+    color: '#6B6B6B',
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#6B6B6B',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    marginHorizontal: 12,
+  },
+
+  // Settings list
+  settingsList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.04)',
+  },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  settingsItemText: {
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
+
+  // Logout
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(214, 69, 69, 0.2)',
+  },
+  logoutText: {
+    fontSize: 16,
+    color: '#D64545',
+    fontWeight: '500',
+  },
+
+  // Version
+  version: {
+    fontSize: 13,
+    color: '#9B9B9B',
+    textAlign: 'center',
+    marginTop: 32,
+    marginBottom: 20,
+  },
 });

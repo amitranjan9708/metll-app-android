@@ -36,9 +36,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Memoize callbacks to prevent unnecessary re-renders
   const login = useCallback(async (userData: User) => {
+    console.log('AuthContext login called with:', userData);
     try {
       await AsyncStorage.setItem('user', JSON.stringify(userData));
+      console.log('User saved to AsyncStorage');
       setUser(userData);
+      console.log('User state updated, isAuthenticated will be true');
     } catch (error) {
       console.error('Error saving user:', error);
       throw error;

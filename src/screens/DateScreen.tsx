@@ -132,14 +132,14 @@ export const DateScreen: React.FC = () => {
         try {
             const response = await swipeApi.swipe(currentProfile.id, direction === 'right' ? 'like' : 'pass');
 
-            if (response.data.isMatch && response.data.match) {
+            // Check if we have a match
+            if (response.success && response.data?.isMatch && response.data?.match) {
                 // Show Match Modal
                 setCurrentMatch(response.data.match as MatchData);
                 setIsMatchModalVisible(true);
             }
         } catch (error) {
             console.error('Swipe failed:', error);
-            // In a robust app, we might revert the card stack or show error
         }
     };
 

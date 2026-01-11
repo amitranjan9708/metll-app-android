@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '../components/Button';
@@ -33,6 +34,7 @@ const STEP_CONFIG = {
 export const FaceVerificationScreen: React.FC = () => {
   const theme = useTheme();
   const styles = getStyles(theme);
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { user, updateUser } = useAuth();
   const [step, setStep] = useState<VerificationStep>('photo');
@@ -320,7 +322,7 @@ export const FaceVerificationScreen: React.FC = () => {
       colors={theme.gradients.background.colors as [string, string, string]}
       style={styles.container}
     >
-      <View style={styles.progressBarContainer}>
+      <View style={[styles.progressBarContainer, { paddingTop: insets.top + theme.spacing.md }]}>
         <View style={styles.progressBarBg}>
           <LinearGradient
             colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}

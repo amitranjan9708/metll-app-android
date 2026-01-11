@@ -7,19 +7,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  TouchableOpacity,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { Button } from '../components/Button';
 import { OTPInput } from '../components/OTPInput';
-import { Card } from '../components/Card';
-import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+import { authApi } from '../services/api';
 
 export const OTPScreen: React.FC = () => {
-  const theme = useTheme();
-  const styles = getStyles(theme);
+  const insets = useSafeAreaInsets();
   const route = useRoute();
   const { login } = useAuth();
   const [otp, setOtp] = useState('');
@@ -28,15 +26,20 @@ export const OTPScreen: React.FC = () => {
   const [canResend, setCanResend] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   const user = (route.params as any)?.user;
+  
+  // Debug: Log user data
+  useEffect(() => {
+    console.log('OTPScreen user data:', user);
+  }, [user]);
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 500,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
@@ -50,9 +53,7 @@ export const OTPScreen: React.FC = () => {
 
   useEffect(() => {
     if (timer > 0) {
-      const interval = setInterval(() => {
-        setTimer((t) => t - 1);
-      }, 1000);
+      const interval = setInterval(() => setTimer((t) => t - 1), 1000);
       return () => clearInterval(interval);
     } else {
       setCanResend(true);
@@ -60,18 +61,44 @@ export const OTPScreen: React.FC = () => {
   }, [timer]);
 
   const handleVerify = async () => {
-    if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+    console.log('handleVerify called, OTP:', otp, 'Length:', otp.length);
+    
+    // Validate OTP - check length and ensure all digits are filled
+    const cleanOtp = otp.replace(/\s/g, '');
+    if (cleanOtp.length !== 6) {
+      Alert.alert('Invalid', 'Please enter a valid 6-digit code');
+      return;
+    }
+
+    // Validate user data exists
+    if (!user || !user.name || !user.phone) {
+      Alert.alert('Error', 'User data is missing. Please go back and try again.');
       return;
     }
 
     setLoading(true);
     try {
-      await login({
-        id: Date.now().toString(),
-        ...user,
-      });
+      // Call backend to verify OTP and get auth token
+      const response = await authApi.verifyOtp(user.phone, cleanOtp);
+      
+      if (!response.success || !response.data) {
+        Alert.alert('Error', response.message || 'Verification failed');
+        return;
+      }
+
+      // Create user data from backend response
+      const userData = {
+        id: response.data.user.id.toString(),
+        name: response.data.user.name || user.name,
+        email: response.data.user.email || user.email || '',
+        phone: response.data.user.phone || user.phone,
+        createdAt: new Date().toISOString(),
+      };
+      
+      await login(userData);
+      // Navigation will happen automatically due to auth state change
     } catch (error) {
+      console.error('Login error:', error);
       Alert.alert('Error', 'Verification failed. Please try again.');
     } finally {
       setLoading(false);
@@ -82,131 +109,117 @@ export const OTPScreen: React.FC = () => {
     if (!canResend) return;
     setTimer(30);
     setCanResend(false);
-    Alert.alert('OTP Sent', 'A new OTP has been sent to your phone.');
+    Alert.alert('Sent', 'A new code has been sent to your phone.');
   };
 
   return (
-    <LinearGradient
-      colors={theme.gradients.background.colors as [string, string, string]}
-      style={styles.gradient}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Animated.View
           style={[
             styles.content,
             {
+              paddingTop: insets.top + 80,
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
             },
           ]}
         >
-          <View style={styles.iconContainer}>
-            <LinearGradient
-              colors={theme.gradients.primary.colors as [string, string]}
-              style={styles.iconGradient}
-            >
-              <Ionicons name="shield-checkmark" size={40} color={theme.colors.white} />
-            </LinearGradient>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Verify your number</Text>
+            <Text style={styles.subtitle}>
+              Enter the 6-digit code sent to{'\n'}
+              <Text style={styles.phoneText}>{user?.phone || 'your phone'}</Text>
+            </Text>
           </View>
 
-          <Text style={styles.title}>Verify Your Number</Text>
-          <Text style={styles.subtitle}>
-            We've sent a 6-digit code to{'\n'}
-            <Text style={styles.phoneText}>{user?.phone || 'your phone'}</Text>
-          </Text>
-
-          <Card style={styles.card}>
+          {/* OTP Input */}
+          <View style={styles.otpContainer}>
             <OTPInput value={otp} onChange={setOtp} length={6} />
+          </View>
 
-            <Button
-              title="Verify"
-              onPress={handleVerify}
-              loading={loading}
-              disabled={otp.length !== 6}
-              style={styles.button}
-            />
-          </Card>
+          {/* Verify Button */}
+          <Button
+            title="Verify"
+            onPress={handleVerify}
+            loading={loading}
+            disabled={otp.replace(/\s/g, '').length !== 6}
+            style={styles.button}
+          />
 
+          {/* Resend */}
           <View style={styles.resendContainer}>
             {canResend ? (
-              <Button
-                title="Resend Code"
-                onPress={handleResend}
-                variant="outline"
-              />
+              <TouchableOpacity onPress={handleResend}>
+                <Text style={styles.resendLink}>Resend code</Text>
+              </TouchableOpacity>
             ) : (
               <Text style={styles.timerText}>
-                Resend code in <Text style={styles.timerHighlight}>{timer}s</Text>
+                Resend in <Text style={styles.timerHighlight}>{timer}s</Text>
               </Text>
             )}
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 };
 
-const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
+    backgroundColor: '#FAFAFA',
+  },
+  flex: {
+    flex: 1,
   },
   content: {
-    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 24,
   },
-  iconContainer: {
-    marginBottom: theme.spacing.xl,
-  },
-  iconGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.glow,
+  header: {
+    marginBottom: 48,
   },
   title: {
-    ...theme.typography.heading,
-    color: theme.colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.sm,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
+    marginBottom: 16,
   },
   subtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.xl,
-    lineHeight: 24,
+    fontSize: 17,
+    color: '#6B6B6B',
+    lineHeight: 26,
   },
   phoneText: {
-    color: theme.colors.primary,
+    color: '#1A1A1A',
     fontWeight: '600',
   },
-  card: {
-    width: '100%',
-    alignItems: 'center',
+  otpContainer: {
+    marginBottom: 32,
   },
   button: {
-    marginTop: theme.spacing.xl,
-    width: '100%',
+    marginBottom: 24,
   },
   resendContainer: {
-    marginTop: theme.spacing.xl,
     alignItems: 'center',
   },
   timerText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
+    fontSize: 15,
+    color: '#6B6B6B',
   },
   timerHighlight: {
-    color: theme.colors.primary,
+    color: '#1A1A1A',
+    fontWeight: '600',
+  },
+  resendLink: {
+    fontSize: 15,
+    color: '#E07A5F',
     fontWeight: '600',
   },
 });

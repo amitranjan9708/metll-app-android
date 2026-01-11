@@ -9,61 +9,74 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { useTheme } from '../theme/useTheme';
 import { User } from '../types';
-import { Ionicons } from '@expo/vector-icons';
+import { authApi } from '../services/api';
 
 export const RegisterScreen: React.FC = () => {
-  const theme = useTheme();
-  const styles = getStyles(theme);
-  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const heartScale = useRef(new Animated.Value(0.8)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.spring(heartScale, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
+        tension: 50,
         useNativeDriver: true,
       }),
     ]).start();
   }, []);
 
+  // Normalize phone number to E.164 format with Indian country code
+  const normalizePhoneNumber = (phoneNum: string): string => {
+    // Remove all non-digit characters except +
+    let cleaned = phoneNum.replace(/[^\d+]/g, '');
+    
+    // If already has country code, return as-is
+    if (cleaned.startsWith('+')) {
+      return cleaned;
+    }
+    
+    // If starts with 0, remove it (local format)
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // Add Indian country code
+    return `+91${cleaned}`;
+  };
+
   const validateForm = () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+      Alert.alert('Required', 'Please enter your name');
       return false;
     }
-    if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email');
+    
+    const cleanedPhone = phone.replace(/[^\d]/g, '');
+    if (!cleanedPhone || cleanedPhone.length < 10) {
+      Alert.alert('Required', 'Please enter a valid 10-digit phone number');
       return false;
     }
-    if (!phone.trim() || phone.length < 10) {
-      Alert.alert('Error', 'Please enter a valid phone number');
+    
+    if (!password || password.length < 8) {
+      Alert.alert('Required', 'Password must be at least 8 characters');
       return false;
     }
     return true;
@@ -74,91 +87,98 @@ export const RegisterScreen: React.FC = () => {
 
     setLoading(true);
     try {
+      // Normalize phone number with +91 country code
+      const normalizedPhone = normalizePhoneNumber(phone.trim());
+      console.log('Registering with phone:', normalizedPhone);
+      
+      // Call backend to register and send OTP
+      const response = await authApi.register(name.trim(), normalizedPhone, password);
+      
+      if (!response.success) {
+        Alert.alert('Error', response.message || 'Registration failed');
+        return;
+      }
+
+      // Pass user data to OTP screen
       const user: Partial<User> = {
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim(),
+        phone: normalizedPhone,
       };
-
-      navigation.navigate('OTP' as never, { user } as never);
-    } catch (error) {
-      Alert.alert('Error', 'Registration failed. Please try again.');
+      navigation.navigate('OTP', { user });
+    } catch (error: any) {
+      console.error('Register error:', error);
+      Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <LinearGradient
-      colors={theme.gradients.background.colors as [string, string, string]}
-      style={styles.gradient}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <Animated.View
             style={[
-              styles.header,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: heartScale }],
-              },
-            ]}
-          >
-            <Ionicons name="heart" size={48} color={theme.colors.heart} style={styles.heartIcon} />
-            <Text style={styles.logo}>MetLL</Text>
-            <Text style={styles.tagline}>Find Your Perfect Match</Text>
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.formContainer,
+              styles.content,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
               },
             ]}
           >
-            <View style={styles.titleSection}>
-              <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Start your journey to find love 💕</Text>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Create your account</Text>
+              <Text style={styles.subtitle}>
+                Join thousands finding meaningful connections
+              </Text>
             </View>
 
-            <Card style={styles.card}>
+            {/* Form */}
+            <View style={styles.form}>
               <Input
-                label="Full Name"
-                placeholder="Enter your full name"
+                label="Full name"
+                placeholder="Your name"
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
-                leftIcon={<Ionicons name="person-outline" size={20} color={theme.colors.textSecondary} />}
               />
 
               <Input
                 label="Email"
-                placeholder="your@email.com"
+                placeholder="you@example.com"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                leftIcon={<Ionicons name="mail-outline" size={20} color={theme.colors.textSecondary} />}
               />
 
               <Input
-                label="Phone Number"
-                placeholder="Enter your phone number"
+                label="Phone number (India +91)"
+                placeholder="9876543210"
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
-                maxLength={15}
-                leftIcon={<Ionicons name="call-outline" size={20} color={theme.colors.textSecondary} />}
+                maxLength={10}
+              />
+
+              <Input
+                label="Password"
+                placeholder="Minimum 8 characters"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
               />
 
               <Button
@@ -167,74 +187,61 @@ export const RegisterScreen: React.FC = () => {
                 loading={loading}
                 style={styles.button}
               />
-            </Card>
+            </View>
 
+            {/* Footer */}
             <Text style={styles.footerText}>
-              By continuing, you agree to MetLL's Terms of Service and Privacy Policy
+              By continuing, you agree to our Terms of Service and Privacy Policy
             </Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 };
 
-const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
+const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
+  flex: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
-    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  content: {
+    flex: 1,
   },
   header: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  heartIcon: {
-    marginBottom: theme.spacing.sm,
-  },
-  logo: {
-    ...theme.typography.heading,
-    fontSize: 42,
-    color: theme.colors.textPrimary,
-    letterSpacing: -1,
-  },
-  tagline: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-  },
-  formContainer: {
-    width: '100%',
-  },
-  titleSection: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: 48,
   },
   title: {
-    ...theme.typography.heading,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
+    marginBottom: 12,
   },
   subtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
+    fontSize: 17,
+    color: '#6B6B6B',
+    lineHeight: 24,
   },
-  card: {
-    marginBottom: theme.spacing.lg,
+  form: {
+    marginBottom: 32,
   },
   button: {
-    marginTop: theme.spacing.md,
+    marginTop: 24,
   },
   footerText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
+    fontSize: 13,
+    color: '#9B9B9B',
     textAlign: 'center',
-    marginTop: theme.spacing.md,
-    lineHeight: 18,
+    lineHeight: 20,
+    paddingHorizontal: 24,
   },
 });

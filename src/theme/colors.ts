@@ -1,54 +1,57 @@
+// Hinge-inspired minimal color palette
+// Clean, sophisticated, modern dating app aesthetic
+
 export const colors = {
-  // Primary colors - more vibrant and saturated
-  primary: '#5A6FA3',
-  primaryDark: '#4A5FA8',
-  primaryLight: '#A4B8E7',
-  primaryGradientEnd: '#7A8FC4',
+  // Primary colors - subtle, sophisticated gray-charcoal
+  primary: '#1F1F1F',
+  primaryDark: '#0F0F0F',
+  primaryLight: '#4A4A4A',
+  primaryGradientEnd: '#2D2D2D',
 
-  // Accent colors - warmer, more saturated
-  accent: '#E8A4B8',
-  accentLight: '#F5D0DC',
-  heart: '#E05C5C',
+  // Accent - single subtle accent color (warm coral/terracotta)
+  accent: '#E07A5F',
+  accentLight: 'rgba(224, 122, 95, 0.15)',
+  heart: '#E07A5F',
 
-  // Background colors
-  background: '#F8FAFF',
+  // Background colors - clean, bright
+  background: '#FAFAFA',
   backgroundLight: '#FFFFFF',
   backgroundCard: '#FFFFFF',
 
-  // Glassmorphism
-  glass: 'rgba(164, 184, 231, 0.15)',
-  glassBorder: 'rgba(90, 111, 163, 0.2)',
-  glassLight: 'rgba(164, 184, 231, 0.1)',
+  // Glassmorphism - subtle
+  glass: 'rgba(0, 0, 0, 0.03)',
+  glassBorder: 'rgba(0, 0, 0, 0.08)',
+  glassLight: 'rgba(0, 0, 0, 0.02)',
 
-  // Text colors - stronger contrast
-  textPrimary: '#1A1A2E',
-  textSecondary: '#5A6FA3',
-  textMuted: 'rgba(26, 26, 46, 0.5)',
+  // Text colors - high contrast, clean
+  textPrimary: '#1A1A1A',
+  textSecondary: '#6B6B6B',
+  textMuted: '#9B9B9B',
 
   // UI colors
   white: '#FFFFFF',
   black: '#000000',
   cardBackground: '#FFFFFF',
-  border: 'rgba(90, 111, 163, 0.3)',
-  borderFocus: '#5A6FA3',
+  border: 'rgba(0, 0, 0, 0.08)',
+  borderFocus: '#1F1F1F',
 
-  // Status colors
-  error: '#E53E3E',
-  errorLight: 'rgba(229, 62, 62, 0.1)',
-  success: '#38A169',
-  successLight: 'rgba(56, 161, 105, 0.1)',
-  warning: '#DD6B20',
-  warningLight: 'rgba(221, 107, 32, 0.1)',
+  // Status colors - muted, sophisticated
+  error: '#D64545',
+  errorLight: 'rgba(214, 69, 69, 0.1)',
+  success: '#4CAF50',
+  successLight: 'rgba(76, 175, 80, 0.1)',
+  warning: '#F5A623',
+  warningLight: 'rgba(245, 166, 35, 0.1)',
 
   // Placeholder
-  placeholder: 'rgba(26, 26, 46, 0.4)',
+  placeholder: 'rgba(0, 0, 0, 0.35)',
 
-  // Shadows
-  shadow: 'rgba(90, 111, 163, 0.15)',
-  shadowPrimary: 'rgba(90, 111, 163, 0.25)',
-  shadowAccent: 'rgba(232, 164, 184, 0.3)',
+  // Shadows - subtle
+  shadow: 'rgba(0, 0, 0, 0.08)',
+  shadowPrimary: 'rgba(0, 0, 0, 0.12)',
+  shadowAccent: 'rgba(224, 122, 95, 0.2)',
 
   // Overlay
-  overlay: 'rgba(26, 26, 46, 0.5)',
-  overlayLight: 'rgba(26, 26, 46, 0.3)',
+  overlay: 'rgba(0, 0, 0, 0.5)',
+  overlayLight: 'rgba(0, 0, 0, 0.3)',
 };
