@@ -107,26 +107,13 @@ export const RegisterScreen: React.FC = () => {
       const backendUser = response.data.user as any;
       console.log('📱 Backend user data:', backendUser);
 
-      // Check if user has completed onboarding based on backend data
-      // User is onboarded if they have EITHER situationResponses OR a profile photo
-      // Note: isVerified means phone verified, NOT onboarding complete
-      // situationResponses can be array or object, so check for both
-      const hasSituationResponses = backendUser.situationResponses && (
-        Array.isArray(backendUser.situationResponses) 
-          ? backendUser.situationResponses.length > 0 
-          : Object.keys(backendUser.situationResponses).length > 0
-      );
-      const hasPhoto = !!backendUser.photo || !!backendUser.profilePhoto;
-      
-      const hasCompletedOnboarding = hasSituationResponses || hasPhoto;
+      // Use backend's isOnboarded field directly
+      // This is set to true after user uploads verification video
+      const hasCompletedOnboarding = !!backendUser.isOnboarded;
 
       console.log('📱 User onboarding status:', { 
-        hasSituationResponses, 
-        hasPhoto, 
-        hasCompletedOnboarding,
-        situationResponses: backendUser.situationResponses,
-        photo: backendUser.photo,
-        profilePhoto: backendUser.profilePhoto
+        isOnboarded: backendUser.isOnboarded,
+        hasCompletedOnboarding
       });
 
       // Save ALL user data from backend + set isOnboarded flag

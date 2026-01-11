@@ -63,24 +63,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasSituationResponses: parsedUser.situationResponses?.length || 0
       });
       
-      // MIGRATION: If user doesn't have isOnboarded flag but has completed onboarding steps,
-      // auto-set the flag. This handles users who completed onboarding before this flag existed.
+      // MIGRATION: If user doesn't have isOnboarded flag locally,
+      // use the backend value or default to false (will need to complete onboarding)
       if (parsedUser.isOnboarded === undefined) {
-        // situationResponses can be array or object, so check for both
-        const hasSituationResponses = parsedUser.situationResponses && (
-          Array.isArray(parsedUser.situationResponses) 
-            ? parsedUser.situationResponses.length > 0 
-            : Object.keys(parsedUser.situationResponses).length > 0
-        );
-        const hasPhoto = !!parsedUser.photo || !!parsedUser.profilePhoto;
-        
-        const hasCompletedOnboarding = hasSituationResponses || hasPhoto;
-        
-        if (hasCompletedOnboarding) {
-          console.log('📱 Migrating: Setting isOnboarded=true based on existing data');
-          parsedUser = { ...parsedUser, isOnboarded: true };
-          await AsyncStorage.setItem('user', JSON.stringify(parsedUser));
-        }
+        console.log('📱 User missing isOnboarded flag, defaulting to false');
+        parsedUser = { ...parsedUser, isOnboarded: false };
+        await AsyncStorage.setItem('user', JSON.stringify(parsedUser));
       }
       
       // Set user from local storage - LOCAL DATA IS PRIMARY
