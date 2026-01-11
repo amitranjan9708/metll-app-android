@@ -103,13 +103,36 @@ export const RegisterScreen: React.FC = () => {
         return;
       }
 
-      // Save user to auth context
+      // Backend may return full user profile with all fields
+      const backendUser = response.data.user as any;
+      console.log('📱 Backend user data:', backendUser);
+
+      // Check if user has completed onboarding based on backend data
+      // User is onboarded if they have situationResponses OR a profile photo
+      const hasCompletedOnboarding = !!(
+        (backendUser.situationResponses && backendUser.situationResponses.length > 0) ||
+        backendUser.photo ||
+        backendUser.isVerified
+      );
+
+      console.log('📱 User onboarding status:', hasCompletedOnboarding);
+
+      // Save ALL user data from backend + set isOnboarded flag
       const userData = {
-        id: response.data.user.id.toString(),
-        name: response.data.user.name || '',
-        email: '',
-        phone: response.data.user.phone,
-        createdAt: new Date().toISOString(),
+        id: backendUser.id?.toString() || '',
+        name: backendUser.name || '',
+        email: backendUser.email || '',
+        phone: backendUser.phone || normalizedPhone,
+        photo: backendUser.photo,
+        additionalPhotos: backendUser.additionalPhotos,
+        verificationVideo: backendUser.verificationVideo,
+        school: backendUser.school,
+        college: backendUser.college,
+        office: backendUser.office,
+        homeLocation: backendUser.homeLocation,
+        situationResponses: backendUser.situationResponses,
+        isOnboarded: hasCompletedOnboarding, // Set based on backend data
+        createdAt: backendUser.createdAt || new Date().toISOString(),
       };
       
       await authLogin(userData);

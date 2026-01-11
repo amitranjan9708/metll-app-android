@@ -86,13 +86,36 @@ export const OTPScreen: React.FC = () => {
         return;
       }
 
-      // Create user data from backend response
+      // Backend may return full user profile with all fields
+      const backendUser = response.data.user as any;
+      console.log('📱 Backend user data after OTP:', backendUser);
+
+      // Check if user has completed onboarding based on backend data
+      // User is onboarded if they have situationResponses OR a profile photo
+      const hasCompletedOnboarding = !!(
+        (backendUser.situationResponses && backendUser.situationResponses.length > 0) ||
+        backendUser.photo ||
+        backendUser.isVerified
+      );
+
+      console.log('📱 User onboarding status:', hasCompletedOnboarding);
+
+      // Save ALL user data from backend + set isOnboarded flag
       const userData = {
-        id: response.data.user.id.toString(),
-        name: response.data.user.name || user.name,
-        email: response.data.user.email || user.email || '',
-        phone: response.data.user.phone || user.phone,
-        createdAt: new Date().toISOString(),
+        id: backendUser.id?.toString() || '',
+        name: backendUser.name || user.name,
+        email: backendUser.email || user.email || '',
+        phone: backendUser.phone || user.phone,
+        photo: backendUser.photo,
+        additionalPhotos: backendUser.additionalPhotos,
+        verificationVideo: backendUser.verificationVideo,
+        school: backendUser.school,
+        college: backendUser.college,
+        office: backendUser.office,
+        homeLocation: backendUser.homeLocation,
+        situationResponses: backendUser.situationResponses,
+        isOnboarded: hasCompletedOnboarding, // Set based on backend data
+        createdAt: backendUser.createdAt || new Date().toISOString(),
       };
       
       await login(userData);

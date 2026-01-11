@@ -39,7 +39,18 @@ export const PhotoUploadScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const theme = useTheme();
     const insets = useSafeAreaInsets();
-    const { user, updateUser } = useAuth();
+    const { user, updateUser, logout } = useAuth();
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout? Your progress will be lost.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Logout', style: 'destructive', onPress: logout },
+            ]
+        );
+    };
 
     // Screen step: photos first, then video
     const [screenStep, setScreenStep] = useState<ScreenStep>('photos');
@@ -469,6 +480,15 @@ export const PhotoUploadScreen: React.FC = () => {
             style={styles.container}
         >
             <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + theme.spacing.lg }]}>
+                {/* Header with logout option */}
+                <View style={styles.headerRow}>
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                        <Ionicons name="log-out-outline" size={18} color={theme.colors.textSecondary} />
+                        <Text style={styles.logoutText}>Logout</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <View style={styles.header}>
                     <Text style={styles.title}>Add Your Best Photos</Text>
                     <Text style={styles.subtitle}>
@@ -644,6 +664,28 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     scrollContent: {
         padding: theme.spacing.lg,
         paddingBottom: 100,
+    },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: theme.spacing.sm,
+    },
+    logoutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: theme.colors.backgroundCard,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    logoutText: {
+        marginLeft: 6,
+        color: theme.colors.textSecondary,
+        fontSize: 14,
+        fontWeight: '500',
     },
     header: {
         marginBottom: theme.spacing.xl,

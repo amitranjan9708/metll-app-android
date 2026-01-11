@@ -1,0 +1,63 @@
+name: Build on Push
+
+# Trigger on every push to main/master branch
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  # Run tests and checks first
+  test:
+    name: Run Tests
+    steps:
+      - uses: eas/checkout@v1
+      
+      - uses: eas/use_npm_token@v1
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npx tsc --noEmit
+      
+      - name: Lint check
+        run: npm run lint --if-present
+
+  # Build Android APK for preview
+  build_android_preview:
+    name: Build Android Preview
+    needs: [test]
+    type: build
+    params:
+      platform: android
+      profile: preview
+
+  # Build Android APK for production
+  build_android_production:
+    name: Build Android Production
+    needs: [test]
+    type: build
+    params:
+      platform: android
+      profile: production
+
+  # Build iOS for production (if you have Apple credentials configured)
+  # build_ios_production:
+  #   name: Build iOS Production
+  #   needs: [test]
+  #   type: build
+  #   params:
+  #     platform: ios
+  #     profile: production
+
+  # Submit to stores (optional - uncomment when ready)
+  # submit_android:
+  #   name: Submit to Play Store
+  #   needs: [build_android_production]
+  #   type: submit
+  #   params:
+  #     platform: android
+  #     profile: production
+

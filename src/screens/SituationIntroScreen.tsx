@@ -24,7 +24,18 @@ export const SituationIntroScreen: React.FC = () => {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const styles = getStyles(theme);
-    const { updateUser, completeOnboarding } = useAuth();
+    const { updateUser, completeOnboarding, logout } = useAuth();
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout? Your progress will be lost.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Logout', style: 'destructive', onPress: logout },
+            ]
+        );
+    };
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -120,6 +131,15 @@ export const SituationIntroScreen: React.FC = () => {
             colors={[theme.colors.background, theme.colors.backgroundLight, theme.colors.background]}
             style={[styles.container, { paddingTop: insets.top + theme.spacing.lg }]}
         >
+            {/* Header with logout */}
+            <View style={styles.headerRow}>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                    <Ionicons name="log-out-outline" size={18} color={theme.colors.textSecondary} />
+                    <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
+            </View>
+
             {/* Progress Indicator */}
             <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
@@ -215,6 +235,28 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     container: {
         flex: 1,
         paddingHorizontal: theme.spacing.lg,
+    },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: theme.spacing.sm,
+    },
+    logoutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: theme.colors.backgroundCard,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    logoutText: {
+        marginLeft: 6,
+        color: theme.colors.textSecondary,
+        fontSize: 14,
+        fontWeight: '500',
     },
     progressContainer: {
         alignItems: 'center',

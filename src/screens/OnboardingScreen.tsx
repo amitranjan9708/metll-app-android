@@ -27,6 +27,41 @@ import {
 } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 
+const LogoutButton: React.FC<{ onLogout: () => void; theme: ReturnType<typeof useTheme> }> = ({ onLogout, theme }) => (
+  <TouchableOpacity
+    onPress={() => {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout? Your progress will be lost.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: onLogout },
+        ]
+      );
+    }}
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: theme.colors.glass,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.glassBorder,
+    }}
+  >
+    <Ionicons name="log-out-outline" size={18} color={theme.colors.textSecondary} />
+    <Text style={{ 
+      marginLeft: 6, 
+      color: theme.colors.textSecondary, 
+      fontSize: 14,
+      fontWeight: '500',
+    }}>
+      Logout
+    </Text>
+  </TouchableOpacity>
+);
+
 // Removed 'video' from steps - video verification now happens in PhotoUploadScreen
 type OnboardingStep = 'photo' | 'school' | 'college' | 'office' | 'home' | 'complete';
 
@@ -45,7 +80,7 @@ export const OnboardingScreen: React.FC = () => {
   const styles = getStyles(theme);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const [step, setStep] = useState<OnboardingStep>('photo');
   const [photo, setPhoto] = useState('');
 
@@ -363,7 +398,12 @@ export const OnboardingScreen: React.FC = () => {
 
   return (
     <LinearGradient colors={theme.gradients.background.colors as [string, string, string]} style={styles.container}>
-      <View style={[styles.progressBarContainer, { paddingTop: insets.top + theme.spacing.md }]}>
+      {/* Header with progress bar and logout button */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top + theme.spacing.md }]}>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Complete Your Profile</Text>
+          <LogoutButton onLogout={logout} theme={theme} />
+        </View>
         <View style={styles.progressBarBg}>
           <LinearGradient
             colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
@@ -398,7 +438,9 @@ export const OnboardingScreen: React.FC = () => {
 const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
-  progressBarContainer: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg },
+  headerContainer: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.md },
+  headerTitle: { ...theme.typography.subheading, color: theme.colors.textPrimary },
   progressBarBg: { height: 4, backgroundColor: theme.colors.glass, borderRadius: 2, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 2 },
   stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: theme.spacing.lg },

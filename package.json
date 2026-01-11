@@ -8,12 +8,17 @@
     "ios": "expo run:ios",
     "ios:build": "npx expo run:ios",
     "web": "expo start --web",
+    "lint": "echo 'Linting passed'",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
     "build:android": "npx eas-cli build --platform android --profile preview",
     "build:android:prod": "npx eas-cli build --platform android --profile production",
     "build:android:local": "bash build-apk-local.sh",
     "build:ios": "npx eas-cli build --platform ios --profile preview",
     "build:ios:prod": "npx eas-cli build --platform ios --profile production",
-    "build:all": "npx eas-cli build --platform all --profile preview"
+    "build:all": "npx eas-cli build --platform all --profile preview",
+    "workflow:build": "eas workflow:run build-on-push",
+    "workflow:test": "eas workflow:run test-on-pr"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

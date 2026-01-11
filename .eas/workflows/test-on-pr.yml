@@ -1,0 +1,30 @@
+name: Test on Pull Request
+
+# Trigger on pull requests
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  # Run tests and checks on PRs (no build to save resources)
+  test:
+    name: Run Tests & Checks
+    steps:
+      - uses: eas/checkout@v1
+      
+      - uses: eas/use_npm_token@v1
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npx tsc --noEmit
+      
+      - name: Lint check
+        run: npm run lint --if-present
+      
+      - name: Check for unused dependencies
+        run: npx depcheck --ignores="@babel/*,babel-*,metro-*" || true
+

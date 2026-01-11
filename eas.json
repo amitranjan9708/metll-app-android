@@ -1,4 +1,8 @@
 {
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -11,19 +15,29 @@
       }
     },
     "preview": {
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.0.10:3000/api"
-      }
-    },
-    "production": {
+      "distribution": "internal",
       "android": {
         "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://metll-backend-1.onrender.com/api"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://metll-backend-1.onrender.com/api"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
       }
     }
   }
