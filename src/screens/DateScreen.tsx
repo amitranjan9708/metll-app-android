@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -31,6 +31,19 @@ export const DateScreen: React.FC = () => {
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
+    
+    // Use refs to access latest values in panResponder callbacks
+    const profilesRef = useRef(profiles);
+    const currentIndexRef = useRef(currentIndex);
+    
+    // Keep refs in sync with state
+    useEffect(() => {
+        profilesRef.current = profiles;
+    }, [profiles]);
+    
+    useEffect(() => {
+        currentIndexRef.current = currentIndex;
+    }, [currentIndex]);
 
     // Match Modal State
     const [isMatchModalVisible, setIsMatchModalVisible] = useState(false);
@@ -56,6 +69,22 @@ export const DateScreen: React.FC = () => {
         } catch (error) {
             console.error('Failed to load profiles:', error);
             // Optionally show error toast
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        try {
+            setLoading(true);
+            // Reset all swipes for the current user
+            await swipeApi.resetSwipes();
+            console.log('✅ All swipes reset successfully');
+            // Reload profiles after reset
+            await loadProfiles();
+        } catch (error) {
+            console.error('Failed to reset swipes:', error);
+            Alert.alert('Error', 'Failed to reset swipes. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -94,13 +123,25 @@ export const DateScreen: React.FC = () => {
         extrapolate: 'clamp',
     });
 
+    // Create pan responder that uses refs to access latest values
     const panResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponder: () => {
+                // Only allow pan responder if there are profiles and we haven't reached the end
+                return currentIndexRef.current < profilesRef.current.length && profilesRef.current.length > 0;
+            },
             onPanResponderMove: (_, gesture) => {
-                position.setValue({ x: gesture.dx, y: gesture.dy });
+                // Only allow movement if we have a valid profile
+                if (currentIndexRef.current < profilesRef.current.length) {
+                    position.setValue({ x: gesture.dx, y: gesture.dy });
+                }
             },
             onPanResponderRelease: (_, gesture) => {
+                // Only process swipe if we have a valid profile
+                if (currentIndexRef.current >= profilesRef.current.length) {
+                    resetPosition();
+                    return;
+                }
                 if (gesture.dx > 120) {
                     forceSwipe('right');
                 } else if (gesture.dx < -120) {
@@ -113,6 +154,11 @@ export const DateScreen: React.FC = () => {
     ).current;
 
     const forceSwipe = (direction: 'right' | 'left') => {
+        // Check if we have a valid profile before swiping
+        if (currentIndex >= profiles.length) {
+            resetPosition();
+            return;
+        }
         const x = direction === 'right' ? width + 100 : -width - 100;
         Animated.timing(position, {
             toValue: { x, y: 0 },
@@ -122,25 +168,47 @@ export const DateScreen: React.FC = () => {
     };
 
     const onSwipeComplete = async (direction: 'right' | 'left') => {
-        const currentProfile = profiles[currentIndex];
-
-        // Optimistically move to next card
-        position.setValue({ x: 0, y: 0 });
-        setCurrentIndex(prevIndex => prevIndex + 1);
-
-        // API Call
-        try {
-            const response = await swipeApi.swipe(currentProfile.id, direction === 'right' ? 'like' : 'pass');
-
-            // Check if we have a match
-            if (response.success && response.data?.isMatch && response.data?.match) {
-                // Show Match Modal
-                setCurrentMatch(response.data.match as MatchData);
-                setIsMatchModalVisible(true);
+        // Use a closure to capture the current index at the time of swipe
+        setCurrentIndex(prevIndex => {
+            // Check if we have a valid profile at the current index
+            if (prevIndex >= profiles.length) {
+                resetPosition();
+                return prevIndex; // Don't increment if we're already at the end
             }
-        } catch (error) {
-            console.error('Swipe failed:', error);
-        }
+
+            const currentProfile = profiles[prevIndex];
+
+            // Guard: Check if profile exists
+            if (!currentProfile || !currentProfile.id) {
+                console.warn('Cannot swipe: currentProfile is undefined or missing id', {
+                    index: prevIndex,
+                    profilesLength: profiles.length,
+                    profile: currentProfile
+                });
+                resetPosition();
+                return prevIndex; // Don't increment if profile is invalid
+            }
+
+            // API Call - use the captured profile
+            swipeApi.swipe(currentProfile.id, direction === 'right' ? 'like' : 'pass')
+                .then((response) => {
+                    // Check if we have a match
+                    if (response.success && response.data?.isMatch && response.data?.match) {
+                        // Show Match Modal
+                        setCurrentMatch(response.data.match as MatchData);
+                        setIsMatchModalVisible(true);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Swipe failed:', error);
+                });
+
+            // Return incremented index only if profile was valid
+            return prevIndex + 1;
+        });
+
+        // Reset position for next card
+        position.setValue({ x: 0, y: 0 });
     };
 
     const resetPosition = () => {
@@ -182,7 +250,7 @@ export const DateScreen: React.FC = () => {
                 <Text style={[styles.noMoreSubtext, { color: theme.colors.textSecondary }]}>
                     Check back later for more matches!
                 </Text>
-                <Button title="Refresh" onPress={loadProfiles} variant="outline" style={{ marginTop: 20 }} />
+                <Button title="Refresh" onPress={handleRefresh} variant="outline" style={{ marginTop: 20 }} />
             </View>
         );
     };

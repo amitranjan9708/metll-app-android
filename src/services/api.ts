@@ -709,6 +709,55 @@ export const authApi = {
     },
 
     /**
+     * Get user profile from backend
+     * GET /api/user/profile
+     */
+    getUserProfile: async (): Promise<{ success: boolean; message?: string; data?: { user: any } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const mockResponse = {
+                success: true,
+                data: {
+                    user: {
+                        id: '1',
+                        name: 'User',
+                        email: 'user@example.com',
+                        phone: '+919876543210',
+                        photo: null,
+                        additionalPhotos: [],
+                        verificationVideo: null,
+                        school: null,
+                        college: null,
+                        office: null,
+                        homeLocation: null,
+                        situationResponses: null,
+                    },
+                },
+            };
+            logMock('authApi.getUserProfile()', mockResponse);
+            return mockResponse;
+        }
+
+        try {
+            logRequest('GET', '/user/profile', undefined);
+            const startTime = Date.now();
+            
+            const response = await authFetch('/user/profile', {
+                method: 'GET',
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('GET', '/user/profile', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('GET', '/user/profile', error);
+            throw error;
+        }
+    },
+
+    /**
      * Update user profile (sync with backend)
      * This sends profile data to the backend
      */
@@ -907,6 +956,31 @@ export const swipeApi = {
             }
         } catch (error) {
             console.error('Unmatch error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Reset all swipes for the current user (delete all swipe records)
+     */
+    resetSwipes: async (): Promise<{ success: boolean; message?: string; data?: { deletedCount: number } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            logMock('swipeApi.resetSwipes()', { success: true, deletedCount: 5 });
+            return { success: true, data: { deletedCount: 5 } };
+        }
+
+        try {
+            const response = await authFetch('/swipe/reset', {
+                method: 'DELETE',
+            });
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to reset swipes');
+            }
+            return data;
+        } catch (error) {
+            console.error('Reset swipes error:', error);
             throw error;
         }
     },

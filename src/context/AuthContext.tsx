@@ -128,8 +128,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try {
-      await AsyncStorage.removeItem('user');
+      // Clear all user-related data from local storage
+      const keysToRemove = [
+        'user',
+        '@user_profile_cache',
+        'authToken',
+      ];
+      
+      // Also clear chat storage (if exists)
+      const allKeys = await AsyncStorage.getAllKeys();
+      const chatKeys = allKeys.filter(k => k.startsWith('@chat_') || k.startsWith('@chat_sync_'));
+      
+      await AsyncStorage.multiRemove([...keysToRemove, ...chatKeys]);
       setUser(null);
+      console.log('✅ All local data cleared on logout');
     } catch (error) {
       console.error('Error logging out:', error);
     }

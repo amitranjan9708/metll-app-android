@@ -9,12 +9,14 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
 
   const handleLogout = () => {
@@ -33,8 +35,16 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const settingsItems = [
-    { icon: 'person-outline', title: 'Edit Profile' },
-    { icon: 'diamond-outline', title: 'Subscription' },
+    { 
+      icon: 'person-outline', 
+      title: 'Edit Profile',
+      onPress: () => navigation.navigate('EditProfile'),
+    },
+    { 
+      icon: 'diamond-outline', 
+      title: 'Subscription',
+      onPress: () => navigation.navigate('Subscription'),
+    },
     { icon: 'notifications-outline', title: 'Notifications' },
     { icon: 'lock-closed-outline', title: 'Privacy & Security' },
     { icon: 'help-circle-outline', title: 'Help & Support' },
@@ -89,7 +99,7 @@ export const SettingsScreen: React.FC = () => {
             <TouchableOpacity
               key={index}
               style={styles.settingsItem}
-              onPress={() => Alert.alert('Coming Soon', `${item.title} coming soon`)}
+              onPress={item.onPress || (() => Alert.alert('Coming Soon', `${item.title} coming soon`))}
               activeOpacity={0.6}
             >
               <View style={styles.settingsItemLeft}>

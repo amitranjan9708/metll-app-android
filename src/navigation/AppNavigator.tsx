@@ -11,6 +11,7 @@ import { LoadingScreen } from '../components/LoadingScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { OTPScreen } from '../screens/OTPScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LiveMatchingScreen } from '../screens/LiveMatchingScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -200,15 +201,14 @@ export const AppNavigator = () => {
             />
             <Stack.Screen
               name="EditProfile"
-              component={OnboardingScreen}
+              component={EditProfileScreen}
               options={{
-                headerShown: true,
-                title: 'Edit Profile',
-                headerTransparent: true,
-                headerBackTitleVisible: false,
+                headerShown: false,
                 gestureEnabled: true,
               }}
             />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="PhotoUpload" component={PhotoUploadScreen} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
           </>
         )}
