@@ -145,6 +145,7 @@ export const AppNavigator = () => {
 
     // Connect socket service
     socketService.connect();
+    console.log('🔌 Socket connection initiated in AppNavigator');
 
     // Listen for incoming calls
     const handleIncomingCall = (callData: {
@@ -159,9 +160,16 @@ export const AppNavigator = () => {
       appId: string;
     }) => {
       console.log('📞 Incoming call received in AppNavigator:', callData);
+      console.log('📞 Navigation ready?', navigationRef.isReady());
       
       // Navigate to CallScreen if navigation is ready
       if (navigationRef.isReady()) {
+        console.log('📞 Navigating to CallScreen with params:', {
+          callId: callData.callId,
+          matchId: callData.matchId,
+          userName: callData.callerName,
+          isIncoming: true,
+        });
         (navigationRef as any).navigate('Call', {
           callId: callData.callId,
           matchId: callData.matchId,
@@ -170,8 +178,12 @@ export const AppNavigator = () => {
           callType: callData.type,
           isIncoming: true,
           channelName: callData.channelName,
+          token: callData.token,
+          appId: callData.appId,
           callerId: callData.callerId,
         });
+      } else {
+        console.warn('⚠️ Navigation not ready, cannot navigate to CallScreen');
       }
     };
 
