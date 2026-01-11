@@ -18,12 +18,12 @@ const getBaseUrl = () => {
             return url;
         }
     }
-    
+
     // Use production or local based on flag
     if (USE_PRODUCTION_API) {
         return PRODUCTION_URL;
     }
-    
+
     return `http://${LOCAL_IP}:3000/api`;
 };
 
@@ -190,7 +190,7 @@ const authFetch = async (endpoint: string, options: RequestInit = {}): Promise<R
         // Clone response to log it without consuming
         const clonedResponse = response.clone();
         const duration = Date.now() - startTime;
-        
+
         try {
             const responseData = await clonedResponse.json();
             logResponse(method, endpoint, response.status, responseData, duration);
@@ -256,7 +256,7 @@ export const authApi = {
             const body = { name, phoneNumber, password };
             logRequest('POST', '/auth/register', { name, phoneNumber });
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -298,7 +298,7 @@ export const authApi = {
         try {
             logRequest('POST', '/auth/verify-otp', { phone, otp });
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -345,7 +345,7 @@ export const authApi = {
             const body = { phoneNumber, password };
             logRequest('POST', '/auth/login', { phoneNumber });
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -385,7 +385,7 @@ export const authApi = {
             const body = { phoneNumber };
             logRequest('POST', '/auth/forgot-password', { phoneNumber });
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -421,7 +421,7 @@ export const authApi = {
             const body = { phoneNumber, otp, newPassword };
             logRequest('POST', '/auth/reset-password', { phoneNumber });
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -457,7 +457,7 @@ export const authApi = {
      */
     validateSession: async (): Promise<{ valid: boolean; user?: any; message?: string }> => {
         const token = await getAuthToken();
-        
+
         if (!token) {
             return { valid: false, message: 'No token found' };
         }
@@ -470,7 +470,7 @@ export const authApi = {
         try {
             logRequest('GET', '/auth/me', undefined);
             const startTime = Date.now();
-            
+
             const response = await fetch(`${API_BASE_URL}/auth/me`, {
                 method: 'GET',
                 headers: {
@@ -513,11 +513,11 @@ export const authApi = {
         try {
             const token = await getAuthToken();
             const formData = new FormData();
-            
+
             // Get file info from URI
             const uriParts = imageUri.split('/');
             const fileName = uriParts[uriParts.length - 1];
-            
+
             formData.append('photo', {
                 uri: imageUri,
                 type: 'image/jpeg',
@@ -568,11 +568,11 @@ export const authApi = {
         try {
             const token = await getAuthToken();
             const formData = new FormData();
-            
+
             imageUris.forEach((uri, index) => {
                 const uriParts = uri.split('/');
                 const fileName = uriParts[uriParts.length - 1];
-                
+
                 formData.append('images', {
                     uri: uri,
                     type: 'image/jpeg',
@@ -620,14 +620,14 @@ export const authApi = {
 
         try {
             const token = await getAuthToken();
-            
+
             // For additional photos, the backend uses 0-based index
             // Our index 1 = backend index 0, etc.
             const backendIndex = index > 0 ? index - 1 : 0;
-            const endpoint = index === 0 
+            const endpoint = index === 0
                 ? '/user/profile-picture'  // Delete profile picture
                 : `/user/photos/${backendIndex}`;  // Delete additional photo
-            
+
             logRequest('DELETE', endpoint, { index });
             const startTime = Date.now();
 
@@ -671,10 +671,10 @@ export const authApi = {
         try {
             const token = await getAuthToken();
             const formData = new FormData();
-            
+
             const uriParts = videoUri.split('/');
             const fileName = uriParts[uriParts.length - 1];
-            
+
             formData.append('video', {
                 uri: videoUri,
                 type: 'video/mp4',
@@ -740,7 +740,7 @@ export const authApi = {
         try {
             logRequest('PUT', '/user/profile', profileData);
             const startTime = Date.now();
-            
+
             const response = await authFetch('/user/profile', {
                 method: 'PUT',
                 body: JSON.stringify(profileData),
@@ -1064,6 +1064,105 @@ export const chatApi = {
 
         } catch (error) {
             console.error('Upload media error:', error);
+            throw error;
+        }
+    },
+};
+
+// ==========================================
+// Calls API
+// ==========================================
+
+export const callsApi = {
+    /**
+     * Initiate a new call
+     */
+    initiateCall: async (matchId: number, type: 'voice' | 'video' = 'voice'): Promise<{
+        callId: number;
+        channelName: string;
+        token: string;
+        appId: string;
+        receiver: { id: number; name: string; photo?: string };
+    }> => {
+        try {
+            const response = await authFetch('/calls/initiate', {
+                method: 'POST',
+                body: JSON.stringify({ matchId, type }),
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to initiate call');
+            }
+
+            return data.data;
+        } catch (error) {
+            console.error('Initiate call error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Answer an incoming call
+     */
+    answerCall: async (callId: number): Promise<{ callId: number; channelName: string }> => {
+        try {
+            const response = await authFetch(`/calls/${callId}/answer`, {
+                method: 'PUT',
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to answer call');
+            }
+
+            return data.data;
+        } catch (error) {
+            console.error('Answer call error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Decline an incoming call
+     */
+    declineCall: async (callId: number): Promise<void> => {
+        try {
+            const response = await authFetch(`/calls/${callId}/decline`, {
+                method: 'PUT',
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to decline call');
+            }
+        } catch (error) {
+            console.error('Decline call error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * End an active call
+     */
+    endCall: async (callId: number): Promise<{ callId: number; duration?: number }> => {
+        try {
+            const response = await authFetch(`/calls/${callId}/end`, {
+                method: 'PUT',
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to end call');
+            }
+
+            return data.data;
+        } catch (error) {
+            console.error('End call error:', error);
             throw error;
         }
     },

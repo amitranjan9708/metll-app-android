@@ -165,3 +165,44 @@ export interface SwipeResponse {
     };
   };
 }
+
+// ==========================================
+// Call Types
+// ==========================================
+
+export interface Call {
+  id: number;
+  chatRoomId: number;
+  callerId: number;
+  receiverId: number;
+  channelName: string;
+  status: 'pending' | 'active' | 'ended' | 'missed';
+  type: 'voice' | 'video';
+  startedAt?: string;
+  endedAt?: string;
+  duration?: number;
+  createdAt: string;
+}
+
+export interface CallInitiateResponse {
+  callId: number;
+  channelName: string;
+  token: string;
+  appId: string;
+  receiver: {
+    id: number;
+    name: string;
+    photo?: string;
+  };
+}
+
+export interface IncomingCallData {
+  callId: number;
+  channelName: string;
+  callerId: number;
+  callerName: string;
+  callerPhoto?: string;
+  type: 'voice' | 'video';
+  token: string;
+  appId: string;
+}

@@ -24,6 +24,7 @@ import { SituationAnswerScreen } from '../screens/SituationAnswerScreen';
 import { MatchesScreen } from '../screens/MatchesScreen';
 import { ChatScreen } from '../screens/ChatScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
+import { CallScreen } from '../screens/CallScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -32,7 +33,7 @@ const TabBarIcon = ({ name, focused }: { name: string; focused: boolean }) => {
   const iconName = focused ? name : `${name}-outline`;
   const { colors } = useTheme();
   const iconColor = focused ? colors.primary : colors.textMuted;
-  
+
   return <Ionicons name={iconName as any} size={24} color={iconColor} />;
 };
 
@@ -123,9 +124,9 @@ export const AppNavigator = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { colors } = useTheme();
 
-  console.log('AppNavigator render:', { 
-    isAuthenticated, 
-    isLoading, 
+  console.log('AppNavigator render:', {
+    isAuthenticated,
+    isLoading,
     isOnboarded: user?.isOnboarded,
     hasPhoto: !!user?.photo,
   });
@@ -187,6 +188,14 @@ export const AppNavigator = () => {
               options={{
                 gestureEnabled: true,
                 ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
+            <Stack.Screen
+              name="Call"
+              component={CallScreen}
+              options={{
+                gestureEnabled: false,
+                ...TransitionPresets.ModalSlideFromBottomIOS,
               }}
             />
             <Stack.Screen

@@ -10,3 +10,4 @@ export { SituationSelectionScreen } from './SituationSelectionScreen';
 export { SituationAnswerScreen } from './SituationAnswerScreen';
 export { PhotoUploadScreen } from './PhotoUploadScreen';
 export { DateScreen } from './DateScreen';
+export { CallScreen } from './CallScreen';

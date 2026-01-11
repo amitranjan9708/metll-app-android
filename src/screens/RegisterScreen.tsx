@@ -52,17 +52,17 @@ export const RegisterScreen: React.FC = () => {
   const normalizePhoneNumber = (phoneNum: string): string => {
     // Remove all non-digit characters except +
     let cleaned = phoneNum.replace(/[^\d+]/g, '');
-    
+
     // If already has country code, return as-is
     if (cleaned.startsWith('+')) {
       return cleaned;
     }
-    
+
     // If starts with 0, remove it (local format)
     if (cleaned.startsWith('0')) {
       cleaned = cleaned.substring(1);
     }
-    
+
     // Add Indian country code
     return `+91${cleaned}`;
   };
@@ -73,7 +73,7 @@ export const RegisterScreen: React.FC = () => {
       Alert.alert('Required', 'Please enter a valid 10-digit phone number');
       return false;
     }
-    
+
     if (!password || password.length < 8) {
       Alert.alert('Required', 'Password must be at least 8 characters');
       return false;
@@ -84,7 +84,7 @@ export const RegisterScreen: React.FC = () => {
       Alert.alert('Required', 'Please enter your name');
       return false;
     }
-    
+
     return true;
   };
 
@@ -95,9 +95,9 @@ export const RegisterScreen: React.FC = () => {
     try {
       const normalizedPhone = normalizePhoneNumber(phone.trim());
       console.log('Logging in with phone:', normalizedPhone);
-      
+
       const response = await authApi.login(normalizedPhone, password);
-      
+
       if (!response.success || !response.data) {
         Alert.alert('Error', response.message || 'Login failed');
         return;
@@ -111,7 +111,7 @@ export const RegisterScreen: React.FC = () => {
       // This is set to true after user uploads verification video
       const hasCompletedOnboarding = !!backendUser.isOnboarded;
 
-      console.log('📱 User onboarding status:', { 
+      console.log('📱 User onboarding status:', {
         isOnboarded: backendUser.isOnboarded,
         hasCompletedOnboarding
       });
@@ -133,7 +133,7 @@ export const RegisterScreen: React.FC = () => {
         isOnboarded: hasCompletedOnboarding, // Set based on backend data
         createdAt: backendUser.createdAt || new Date().toISOString(),
       };
-      
+
       await authLogin(userData);
       // Navigation will happen automatically due to auth state change
     } catch (error: any) {
@@ -152,10 +152,10 @@ export const RegisterScreen: React.FC = () => {
       // Normalize phone number with +91 country code
       const normalizedPhone = normalizePhoneNumber(phone.trim());
       console.log('Registering with phone:', normalizedPhone);
-      
+
       // Call backend to register and send OTP
       const response = await authApi.register(name.trim(), normalizedPhone, password);
-      
+
       if (!response.success) {
         Alert.alert('Error', response.message || 'Registration failed');
         return;
@@ -210,8 +210,8 @@ export const RegisterScreen: React.FC = () => {
                 {isLoginMode ? 'Welcome back' : 'Create your account'}
               </Text>
               <Text style={styles.subtitle}>
-                {isLoginMode 
-                  ? 'Sign in to continue' 
+                {isLoginMode
+                  ? 'Sign in to continue'
                   : 'Join thousands finding meaningful connections'}
               </Text>
             </View>
@@ -255,12 +255,13 @@ export const RegisterScreen: React.FC = () => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                showPasswordToggle
                 autoCapitalize="none"
                 autoCorrect={false}
               />
 
               {isLoginMode && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.forgotPasswordContainer}
                   onPress={() => navigation.navigate('ForgotPassword')}
                 >

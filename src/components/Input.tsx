@@ -7,14 +7,17 @@ import {
   TextInputProps,
   ViewStyle,
   Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../theme/useTheme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
   leftIcon?: React.ReactNode;
+  showPasswordToggle?: boolean;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -22,6 +25,8 @@ export const Input: React.FC<InputProps> = ({
   error,
   containerStyle,
   leftIcon,
+  showPasswordToggle,
+  secureTextEntry,
   style,
   onFocus,
   onBlur,
@@ -30,7 +35,11 @@ export const Input: React.FC<InputProps> = ({
   const theme = useTheme();
   const styles = getStyles(theme);
   const [isFocused, setIsFocused] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Determine if we should show the password toggle icon
+  const shouldShowToggle = secureTextEntry && showPasswordToggle;
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
@@ -51,6 +60,10 @@ export const Input: React.FC<InputProps> = ({
     onBlur?.(e);
   };
 
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
+
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -69,13 +82,28 @@ export const Input: React.FC<InputProps> = ({
           style={[
             styles.input,
             leftIcon ? styles.inputWithIcon : undefined,
+            shouldShowToggle ? styles.inputWithRightIcon : undefined,
             style,
           ]}
           placeholderTextColor={theme.colors.placeholder}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          secureTextEntry={secureTextEntry && !isPasswordVisible}
           {...props}
         />
+        {shouldShowToggle && (
+          <TouchableOpacity
+            style={styles.rightIconContainer}
+            onPress={togglePasswordVisibility}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons
+              name={isPasswordVisible ? 'eye-off' : 'eye'}
+              size={22}
+              color={theme.colors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
       </Animated.View>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -120,6 +148,16 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   },
   inputWithIcon: {
     paddingLeft: theme.spacing.sm,
+  },
+  inputWithRightIcon: {
+    paddingRight: 48,
+  },
+  rightIconContainer: {
+    position: 'absolute',
+    right: theme.spacing.md,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorText: {
     ...theme.typography.caption,

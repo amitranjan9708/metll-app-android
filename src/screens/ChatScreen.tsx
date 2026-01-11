@@ -296,6 +296,18 @@ export const ChatScreen: React.FC = () => {
                     <Text style={styles.headerStatus}>Active now</Text>
                 </View>
 
+                <TouchableOpacity
+                    style={styles.callButton}
+                    onPress={() => (navigation as any).navigate('Call', {
+                        matchId,
+                        userName,
+                        userPhoto,
+                        callType: 'voice'
+                    })}
+                >
+                    <Ionicons name="call" size={22} color={theme.colors.primary} />
+                </TouchableOpacity>
+
                 <TouchableOpacity style={styles.optionButton} onPress={handleUnmatch}>
                     <Ionicons name="ellipsis-vertical" size={24} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
@@ -382,6 +394,10 @@ const getStyles = (theme: any) => StyleSheet.create({
     headerStatus: {
         fontSize: 12,
         color: theme.colors.primary,
+    },
+    callButton: {
+        padding: 8,
+        marginRight: 4,
     },
     optionButton: {
         padding: 4,

@@ -23,7 +23,7 @@ type Step = 'phone' | 'otp' | 'newPassword';
 export const ForgotPasswordScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  
+
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -76,7 +76,7 @@ export const ForgotPasswordScreen: React.FC = () => {
     try {
       const normalizedPhone = normalizePhoneNumber(phone.trim());
       const response = await authApi.requestPasswordReset(normalizedPhone);
-      
+
       if (!response.success) {
         Alert.alert('Error', response.message || 'Failed to send OTP');
         return;
@@ -115,7 +115,7 @@ export const ForgotPasswordScreen: React.FC = () => {
     try {
       const normalizedPhone = normalizePhoneNumber(phone.trim());
       const response = await authApi.resetPassword(normalizedPhone, otp, newPassword);
-      
+
       if (!response.success) {
         Alert.alert('Error', response.message || 'Failed to reset password');
         return;
@@ -165,8 +165,8 @@ export const ForgotPasswordScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Back Button */}
-          <TouchableOpacity 
-            style={styles.backButton} 
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={() => step === 'phone' ? navigation.goBack() : setStep(step === 'newPassword' ? 'otp' : 'phone')}
           >
             <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
@@ -213,7 +213,7 @@ export const ForgotPasswordScreen: React.FC = () => {
                 <View style={styles.otpContainer}>
                   <OTPInput value={otp} onChange={setOtp} length={6} />
                 </View>
-                
+
                 <Button
                   title="Verify OTP"
                   onPress={handleVerifyOTP}
@@ -243,6 +243,7 @@ export const ForgotPasswordScreen: React.FC = () => {
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
+                  showPasswordToggle
                   autoCapitalize="none"
                 />
                 <Input
@@ -251,6 +252,7 @@ export const ForgotPasswordScreen: React.FC = () => {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
+                  showPasswordToggle
                   autoCapitalize="none"
                 />
                 <Button
