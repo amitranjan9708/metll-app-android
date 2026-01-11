@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -15,10 +16,13 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { User } from '../types';
 import { authApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export const RegisterScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const { login: authLogin } = useAuth();
+  const [isLoginMode, setIsLoginMode] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -64,11 +68,6 @@ export const RegisterScreen: React.FC = () => {
   };
 
   const validateForm = () => {
-    if (!name.trim()) {
-      Alert.alert('Required', 'Please enter your name');
-      return false;
-    }
-    
     const cleanedPhone = phone.replace(/[^\d]/g, '');
     if (!cleanedPhone || cleanedPhone.length < 10) {
       Alert.alert('Required', 'Please enter a valid 10-digit phone number');
@@ -79,7 +78,48 @@ export const RegisterScreen: React.FC = () => {
       Alert.alert('Required', 'Password must be at least 8 characters');
       return false;
     }
+
+    // Only require name for registration
+    if (!isLoginMode && !name.trim()) {
+      Alert.alert('Required', 'Please enter your name');
+      return false;
+    }
+    
     return true;
+  };
+
+  const handleLogin = async () => {
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      const normalizedPhone = normalizePhoneNumber(phone.trim());
+      console.log('Logging in with phone:', normalizedPhone);
+      
+      const response = await authApi.login(normalizedPhone, password);
+      
+      if (!response.success || !response.data) {
+        Alert.alert('Error', response.message || 'Login failed');
+        return;
+      }
+
+      // Save user to auth context
+      const userData = {
+        id: response.data.user.id.toString(),
+        name: response.data.user.name || '',
+        email: '',
+        phone: response.data.user.phone,
+        createdAt: new Date().toISOString(),
+      };
+      
+      await authLogin(userData);
+      // Navigation will happen automatically due to auth state change
+    } catch (error: any) {
+      console.error('Login error:', error);
+      Alert.alert('Error', error.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegister = async () => {
@@ -114,6 +154,14 @@ export const RegisterScreen: React.FC = () => {
     }
   };
 
+  const handleSubmit = () => {
+    if (isLoginMode) {
+      handleLogin();
+    } else {
+      handleRegister();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -136,31 +184,39 @@ export const RegisterScreen: React.FC = () => {
           >
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Create your account</Text>
+              <Text style={styles.title}>
+                {isLoginMode ? 'Welcome back' : 'Create your account'}
+              </Text>
               <Text style={styles.subtitle}>
-                Join thousands finding meaningful connections
+                {isLoginMode 
+                  ? 'Sign in to continue' 
+                  : 'Join thousands finding meaningful connections'}
               </Text>
             </View>
 
             {/* Form */}
             <View style={styles.form}>
-              <Input
-                label="Full name"
-                placeholder="Your name"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-              />
+              {!isLoginMode && (
+                <>
+                  <Input
+                    label="Full name"
+                    placeholder="Your name"
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                  />
 
-              <Input
-                label="Email"
-                placeholder="you@example.com"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+                  <Input
+                    label="Email (optional)"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </>
+              )}
 
               <Input
                 label="Phone number (India +91)"
@@ -173,7 +229,7 @@ export const RegisterScreen: React.FC = () => {
 
               <Input
                 label="Password"
-                placeholder="Minimum 8 characters"
+                placeholder={isLoginMode ? 'Enter your password' : 'Minimum 8 characters'}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -181,12 +237,33 @@ export const RegisterScreen: React.FC = () => {
                 autoCorrect={false}
               />
 
+              {isLoginMode && (
+                <TouchableOpacity 
+                  style={styles.forgotPasswordContainer}
+                  onPress={() => navigation.navigate('ForgotPassword')}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
+              )}
+
               <Button
-                title="Continue"
-                onPress={handleRegister}
+                title={isLoginMode ? 'Sign In' : 'Continue'}
+                onPress={handleSubmit}
                 loading={loading}
                 style={styles.button}
               />
+            </View>
+
+            {/* Toggle Login/Register */}
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleText}>
+                {isLoginMode ? "Don't have an account? " : 'Already have an account? '}
+              </Text>
+              <TouchableOpacity onPress={() => setIsLoginMode(!isLoginMode)}>
+                <Text style={styles.toggleLink}>
+                  {isLoginMode ? 'Sign Up' : 'Sign In'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Footer */}
@@ -236,6 +313,30 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 24,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  toggleText: {
+    fontSize: 15,
+    color: '#6B6B6B',
+  },
+  toggleLink: {
+    fontSize: 15,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
   },
   footerText: {
     fontSize: 13,

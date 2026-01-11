@@ -306,6 +306,125 @@ export const authApi = {
     },
 
     /**
+     * Login with phone and password
+     */
+    login: async (phoneNumber: string, password: string): Promise<AuthResponse> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const mockResponse: AuthResponse = {
+                success: true,
+                message: 'Login successful',
+                data: {
+                    user: { id: Date.now(), name: 'User', phone: phoneNumber },
+                    token: `mock_token_${Date.now()}`,
+                },
+            };
+            if (mockResponse.data?.token) {
+                await saveAuthToken(mockResponse.data.token);
+            }
+            logMock('authApi.login()', mockResponse);
+            return mockResponse;
+        }
+
+        try {
+            const body = { phoneNumber, password };
+            logRequest('POST', '/auth/login', { phoneNumber });
+            const startTime = Date.now();
+            
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/auth/login', response.status, data, duration);
+
+            if (data.success && data.data?.token) {
+                await saveAuthToken(data.data.token);
+            }
+
+            return data;
+        } catch (error) {
+            logError('POST', '/auth/login', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Request password reset OTP
+     */
+    requestPasswordReset: async (phoneNumber: string): Promise<AuthResponse> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const mockResponse: AuthResponse = {
+                success: true,
+                message: 'OTP sent successfully',
+            };
+            logMock('authApi.requestPasswordReset()', mockResponse);
+            return mockResponse;
+        }
+
+        try {
+            const body = { phoneNumber };
+            logRequest('POST', '/auth/forgot-password', { phoneNumber });
+            const startTime = Date.now();
+            
+            const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/auth/forgot-password', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('POST', '/auth/forgot-password', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Reset password with OTP
+     */
+    resetPassword: async (phoneNumber: string, otp: string, newPassword: string): Promise<AuthResponse> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const mockResponse: AuthResponse = {
+                success: true,
+                message: 'Password reset successfully',
+            };
+            logMock('authApi.resetPassword()', mockResponse);
+            return mockResponse;
+        }
+
+        try {
+            const body = { phoneNumber, otp, newPassword };
+            logRequest('POST', '/auth/reset-password', { phoneNumber });
+            const startTime = Date.now();
+            
+            const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/auth/reset-password', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('POST', '/auth/reset-password', error);
+            throw error;
+        }
+    },
+
+    /**
      * Logout - clear auth token
      */
     logout: async (): Promise<void> => {
@@ -314,6 +433,54 @@ export const authApi = {
             console.log('Auth token removed');
         } catch (error) {
             console.error('Error removing auth token:', error);
+        }
+    },
+
+    /**
+     * Update user profile (sync with backend)
+     * This sends Cloudinary URLs and other profile data to the backend
+     */
+    updateProfile: async (profileData: {
+        name?: string;
+        email?: string;
+        photo?: string; // Main profile photo (first photo)
+        additionalPhotos?: string[];
+        verificationVideo?: string;
+        school?: any;
+        college?: any;
+        office?: any;
+        homeLocation?: any;
+        situationResponses?: any[];
+    }): Promise<{ success: boolean; message?: string; data?: any }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const mockResponse = {
+                success: true,
+                message: 'Profile updated successfully',
+                data: profileData,
+            };
+            logMock('authApi.updateProfile()', mockResponse);
+            return mockResponse;
+        }
+
+        try {
+            logRequest('PUT', '/user/profile', profileData);
+            const startTime = Date.now();
+            
+            const response = await authFetch('/user/profile', {
+                method: 'PUT',
+                body: JSON.stringify(profileData),
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('PUT', '/user/profile', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('PUT', '/user/profile', error);
+            // Don't throw - profile updates should fail silently and retry later
+            return { success: false, message: 'Failed to sync profile' };
         }
     },
 };

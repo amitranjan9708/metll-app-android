@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -295,7 +296,14 @@ export const HomeScreen: React.FC = () => {
           style={styles.profileBtn}
           onPress={() => navigation.navigate('Settings' as never)}
         >
-          <Ionicons name="person-circle-outline" size={32} color="#1A1A1A" />
+          {user?.photo ? (
+            <Image 
+              source={{ uri: user.photo }} 
+              style={styles.profileImage}
+            />
+          ) : (
+            <Ionicons name="person-circle-outline" size={32} color="#1A1A1A" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -433,6 +441,11 @@ const styles = StyleSheet.create({
   },
   profileBtn: {
     padding: 4,
+  },
+  profileImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
 
   // Main content

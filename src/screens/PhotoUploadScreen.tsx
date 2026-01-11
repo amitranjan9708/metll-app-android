@@ -8,6 +8,7 @@ import {
     Alert,
     ScrollView,
     Dimensions,
+    ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,12 +19,23 @@ import { useTheme } from '../theme/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { VideoRecorder } from '../components/VideoRecorder';
+import { uploadMultipleImages, uploadVideo, isCloudinaryConfigured } from '../services/cloudinary';
+import { authApi } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const PHOTO_GAP = 12;
 const PHOTO_SIZE = (width - (24 * 2) - (PHOTO_GAP * 2)) / 3;
 
 type ScreenStep = 'photos' | 'video';
+type UploadStatus = 'idle' | 'uploading' | 'error' | 'success';
+
+interface UploadState {
+    status: UploadStatus;
+    message: string;
+    errorType?: 'cloudinary' | 'backend';
+    photoUrls?: string[];
+    videoUrl?: string;
+}
 
 export const PhotoUploadScreen: React.FC = () => {
     const navigation = useNavigation<any>();
@@ -37,7 +49,12 @@ export const PhotoUploadScreen: React.FC = () => {
     // 6 slots, initially empty (null)
     const [photos, setPhotos] = useState<(string | null)[]>([null, null, null, null, null, null]);
     const [videoUri, setVideoUri] = useState<string | null>(null);
-    const [uploading, setUploading] = useState(false);
+    
+    // Upload state with error handling
+    const [uploadState, setUploadState] = useState<UploadState>({
+        status: 'idle',
+        message: '',
+    });
 
     // Count non-null photos
     const uploadedCount = photos.filter(p => p !== null).length;
@@ -99,7 +116,7 @@ export const PhotoUploadScreen: React.FC = () => {
 
     const handleVideoRecorded = (uri: string) => {
         setVideoUri(uri);
-        // Proceed to save and navigate
+        // Proceed to upload
         handleFinalSubmit(uri);
     };
 
@@ -108,28 +125,259 @@ export const PhotoUploadScreen: React.FC = () => {
         setScreenStep('photos');
     };
 
-    const handleFinalSubmit = async (recordedVideoUri: string) => {
-        setUploading(true);
-        try {
-            // Filter out nulls and save photos
-            const validPhotos = photos.filter((p): p is string => p !== null);
+    // Retry handler - resumes from where it failed
+    const handleRetry = () => {
+        if (!videoUri) return;
+        
+        if (uploadState.errorType === 'cloudinary') {
+            // Retry from Cloudinary upload
+            handleFinalSubmit(videoUri);
+        } else if (uploadState.errorType === 'backend') {
+            // Retry just the backend sync (we already have Cloudinary URLs)
+            retryBackendSync();
+        }
+    };
 
-            // Save both photos and verification video
-            await updateUser({
-                additionalPhotos: validPhotos,
-                verificationVideo: recordedVideoUri,
+    // Retry backend sync with already-uploaded Cloudinary URLs
+    const retryBackendSync = async () => {
+        if (!uploadState.photoUrls || !uploadState.videoUrl) {
+            // No cached URLs, restart full upload
+            if (videoUri) handleFinalSubmit(videoUri);
+            return;
+        }
+
+        setUploadState({
+            status: 'uploading',
+            message: 'Syncing with server...',
+            photoUrls: uploadState.photoUrls,
+            videoUrl: uploadState.videoUrl,
+        });
+
+        try {
+            // Call backend API directly - first photo is the main profile photo
+            const backendResult = await authApi.updateProfile({
+                photo: uploadState.photoUrls[0], // First photo is profile photo
+                additionalPhotos: uploadState.photoUrls,
+                verificationVideo: uploadState.videoUrl,
             });
 
-            // Navigate to next onboarding step
-            navigation.navigate('SituationIntro');
-        } catch (error) {
-            Alert.alert('Error', 'Failed to save. Please try again.');
-        } finally {
-            setUploading(false);
+            if (!backendResult.success) {
+                throw new Error(backendResult.message || 'Backend sync failed');
+            }
+
+            // Update local user state (skip backend sync - we already did it above)
+            await updateUser({
+                photo: uploadState.photoUrls[0], // First photo is profile photo
+                additionalPhotos: uploadState.photoUrls,
+                verificationVideo: uploadState.videoUrl,
+            }, true); // skipBackendSync = true
+
+            setUploadState({ status: 'success', message: 'Profile saved!' });
+            
+            // Navigate to next step
+            setTimeout(() => {
+                navigation.navigate('SituationIntro');
+            }, 500);
+        } catch (error: any) {
+            console.error('Backend sync retry failed:', error);
+            setUploadState({
+                status: 'error',
+                message: error.message || 'Failed to sync with server',
+                errorType: 'backend',
+                photoUrls: uploadState.photoUrls,
+                videoUrl: uploadState.videoUrl,
+            });
+        }
+    };
+
+    const handleFinalSubmit = async (recordedVideoUri: string) => {
+        // Check if Cloudinary is configured
+        if (!isCloudinaryConfigured()) {
+            Alert.alert(
+                'Configuration Error',
+                'Cloudinary is not configured. Please add EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME and EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET to your .env file.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        setUploadState({ status: 'uploading', message: 'Preparing upload...' });
+        
+        try {
+            // Filter out nulls
+            const validPhotos = photos.filter((p): p is string => p !== null);
+            
+            // Step 1: Upload photos to Cloudinary
+            setUploadState({ status: 'uploading', message: 'Uploading photos...' });
+            
+            const photoResult = await uploadMultipleImages(
+                validPhotos,
+                'metll/profiles',
+                (completed, total) => {
+                    setUploadState({ 
+                        status: 'uploading', 
+                        message: `Uploading photo ${completed + 1} of ${total}...` 
+                    });
+                }
+            );
+
+            // Check if photo upload failed
+            if (photoResult.urls.length === 0) {
+                throw { 
+                    type: 'cloudinary', 
+                    message: 'Failed to upload photos. Please check your internet connection.' 
+                };
+            }
+
+            if (photoResult.errors.length > 0 && photoResult.urls.length < validPhotos.length) {
+                console.warn('Some photos failed to upload:', photoResult.errors);
+                // Continue with successfully uploaded photos
+            }
+
+            const photoUrls = photoResult.urls;
+
+            // Step 2: Upload video to Cloudinary
+            setUploadState({ 
+                status: 'uploading', 
+                message: 'Uploading verification video...',
+                photoUrls, // Cache in case we need to retry
+            });
+            
+            const videoResult = await uploadVideo(recordedVideoUri, 'metll/verification');
+            
+            if (!videoResult.success || !videoResult.url) {
+                throw { 
+                    type: 'cloudinary', 
+                    message: 'Failed to upload video. Please check your internet connection.',
+                    photoUrls, // Keep cached
+                };
+            }
+
+            const videoUrl = videoResult.url;
+
+            // Step 3: Sync with backend
+            setUploadState({ 
+                status: 'uploading', 
+                message: 'Saving to your profile...',
+                photoUrls,
+                videoUrl,
+            });
+
+            const backendResult = await authApi.updateProfile({
+                photo: photoUrls[0], // First photo is profile photo
+                additionalPhotos: photoUrls,
+                verificationVideo: videoUrl,
+            });
+
+            if (!backendResult.success) {
+                throw { 
+                    type: 'backend', 
+                    message: backendResult.message || 'Failed to save profile',
+                    photoUrls,
+                    videoUrl,
+                };
+            }
+
+            // Step 4: Update local state (skip backend sync - we already did it above)
+            await updateUser({
+                photo: photoUrls[0], // First photo is profile photo
+                additionalPhotos: photoUrls,
+                verificationVideo: videoUrl,
+            }, true); // skipBackendSync = true
+
+            // Success!
+            setUploadState({ status: 'success', message: 'Profile saved successfully!' });
+            
+            // Navigate to next step after brief delay
+            setTimeout(() => {
+                navigation.navigate('SituationIntro');
+            }, 800);
+
+        } catch (error: any) {
+            console.error('Upload error:', error);
+            
+            if (error.type === 'cloudinary') {
+                setUploadState({
+                    status: 'error',
+                    message: error.message || 'Upload to cloud failed',
+                    errorType: 'cloudinary',
+                    photoUrls: error.photoUrls,
+                });
+            } else if (error.type === 'backend') {
+                setUploadState({
+                    status: 'error',
+                    message: error.message || 'Failed to sync with server',
+                    errorType: 'backend',
+                    photoUrls: error.photoUrls,
+                    videoUrl: error.videoUrl,
+                });
+            } else {
+                setUploadState({
+                    status: 'error',
+                    message: error.message || 'Something went wrong',
+                    errorType: 'cloudinary',
+                });
+            }
         }
     };
 
     const styles = getStyles(theme);
+
+    // Upload Status Overlay Component
+    const renderUploadOverlay = () => {
+        if (uploadState.status === 'idle') return null;
+
+        return (
+            <View style={styles.uploadOverlay}>
+                <View style={styles.uploadModal}>
+                    {uploadState.status === 'uploading' && (
+                        <>
+                            <ActivityIndicator size="large" color={theme.colors.primary} />
+                            <Text style={styles.uploadText}>{uploadState.message}</Text>
+                            <Text style={styles.uploadSubtext}>Please don't close the app</Text>
+                        </>
+                    )}
+                    
+                    {uploadState.status === 'error' && (
+                        <>
+                            <View style={styles.errorIcon}>
+                                <Ionicons name="alert-circle" size={48} color={theme.colors.error} />
+                            </View>
+                            <Text style={styles.errorTitle}>Upload Failed</Text>
+                            <Text style={styles.errorMessage}>{uploadState.message}</Text>
+                            <View style={styles.errorButtons}>
+                                <TouchableOpacity 
+                                    style={styles.retryButton}
+                                    onPress={handleRetry}
+                                >
+                                    <Ionicons name="refresh" size={20} color="#fff" />
+                                    <Text style={styles.retryButtonText}>Retry</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={styles.cancelButton}
+                                    onPress={() => {
+                                        setUploadState({ status: 'idle', message: '' });
+                                        setScreenStep('photos');
+                                    }}
+                                >
+                                    <Text style={styles.cancelButtonText}>Go Back</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </>
+                    )}
+                    
+                    {uploadState.status === 'success' && (
+                        <>
+                            <View style={styles.successIcon}>
+                                <Ionicons name="checkmark-circle" size={48} color={theme.colors.success} />
+                            </View>
+                            <Text style={styles.successText}>{uploadState.message}</Text>
+                        </>
+                    )}
+                </View>
+            </View>
+        );
+    };
 
     // Video Recording Step
     if (screenStep === 'video') {
@@ -139,7 +387,11 @@ export const PhotoUploadScreen: React.FC = () => {
                 style={styles.container}
             >
                 <View style={[styles.videoHeader, { paddingTop: insets.top + theme.spacing.md }]}>
-                    <TouchableOpacity style={styles.backBtn} onPress={handleVideoCancel}>
+                    <TouchableOpacity 
+                        style={styles.backBtn} 
+                        onPress={handleVideoCancel}
+                        disabled={uploadState.status === 'uploading'}
+                    >
                         <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
                     </TouchableOpacity>
                     <Text style={styles.videoTitle}>Verification Video</Text>
@@ -169,6 +421,9 @@ export const PhotoUploadScreen: React.FC = () => {
                         maxDuration={10}
                     />
                 </View>
+
+                {/* Upload Status Overlay */}
+                {renderUploadOverlay()}
             </LinearGradient>
         );
     }
@@ -186,6 +441,16 @@ export const PhotoUploadScreen: React.FC = () => {
                         Upload at least 3 photos. Your first photo will be used for verification.
                     </Text>
                 </View>
+
+                {/* Cloudinary Warning */}
+                {!isCloudinaryConfigured() && (
+                    <View style={styles.warningBanner}>
+                        <Ionicons name="warning" size={20} color="#856404" />
+                        <Text style={styles.warningText}>
+                            Cloudinary not configured. Photos won't be saved to cloud.
+                        </Text>
+                    </View>
+                )}
 
                 <View style={styles.grid}>
                     {photos.map((photoUri, index) => (
@@ -268,9 +533,9 @@ export const PhotoUploadScreen: React.FC = () => {
 
             <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
                 <Button
-                    title={uploading ? "Saving..." : `Continue to Video (${uploadedCount}/6)`}
+                    title={`Continue to Video (${uploadedCount}/6)`}
                     onPress={handlePhotosComplete}
-                    disabled={!isEnough || uploading}
+                    disabled={!isEnough || !isCloudinaryConfigured()}
                     variant={isEnough ? 'primary' : 'outline'}
                 />
             </View>
@@ -299,6 +564,20 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
         ...theme.typography.body,
         color: theme.colors.textSecondary,
         textAlign: 'center',
+    },
+    warningBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff3cd',
+        padding: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        marginBottom: theme.spacing.lg,
+        gap: 8,
+    },
+    warningText: {
+        flex: 1,
+        color: '#856404',
+        fontSize: 13,
     },
     grid: {
         flexDirection: 'row',
@@ -462,5 +741,85 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     },
     videoRecorderContainer: {
         flex: 1,
+    },
+    // Upload overlay styles
+    uploadOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
+    },
+    uploadModal: {
+        backgroundColor: theme.colors.background,
+        borderRadius: theme.borderRadius.xl,
+        padding: theme.spacing.xl,
+        alignItems: 'center',
+        width: '85%',
+        maxWidth: 320,
+        ...theme.shadows.lg,
+    },
+    uploadText: {
+        ...theme.typography.bodyBold,
+        color: theme.colors.textPrimary,
+        marginTop: theme.spacing.lg,
+        textAlign: 'center',
+    },
+    uploadSubtext: {
+        ...theme.typography.caption,
+        color: theme.colors.textSecondary,
+        marginTop: theme.spacing.sm,
+        textAlign: 'center',
+    },
+    // Error state styles
+    errorIcon: {
+        marginBottom: theme.spacing.md,
+    },
+    errorTitle: {
+        ...theme.typography.subheading,
+        color: theme.colors.error,
+        marginBottom: theme.spacing.sm,
+    },
+    errorMessage: {
+        ...theme.typography.body,
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+        marginBottom: theme.spacing.xl,
+    },
+    errorButtons: {
+        width: '100%',
+        gap: theme.spacing.sm,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.primary,
+        paddingVertical: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        gap: 8,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 16,
+    },
+    cancelButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: theme.spacing.md,
+    },
+    cancelButtonText: {
+        color: theme.colors.textSecondary,
+        fontSize: 15,
+    },
+    // Success state styles
+    successIcon: {
+        marginBottom: theme.spacing.md,
+    },
+    successText: {
+        ...theme.typography.bodyBold,
+        color: theme.colors.success,
+        textAlign: 'center',
     },
 });

@@ -23,6 +23,7 @@ import { SituationSelectionScreen } from '../screens/SituationSelectionScreen';
 import { SituationAnswerScreen } from '../screens/SituationAnswerScreen';
 import { MatchesScreen } from '../screens/MatchesScreen';
 import { ChatScreen } from '../screens/ChatScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -164,6 +165,7 @@ export const AppNavigator = () => {
           <>
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="OTP" component={OTPScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           </>
         ) : needsOnboarding ? (
           // Onboarding Flow - Logged in but no photo

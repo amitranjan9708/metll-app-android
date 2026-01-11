@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
@@ -50,10 +51,18 @@ export const SettingsScreen: React.FC = () => {
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={36} color="#6B6B6B" />
+            {user?.photo ? (
+              <Image 
+                source={{ uri: user.photo }} 
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="person" size={36} color="#6B6B6B" />
+            )}
           </View>
           <Text style={styles.name}>{user?.name || 'User'}</Text>
-          <Text style={styles.email}>{user?.email || 'email@example.com'}</Text>
+          <Text style={styles.email}>{user?.phone || user?.email || ''}</Text>
         </View>
 
         {/* Stats */}
@@ -128,6 +137,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 44,
   },
   name: {
     fontSize: 24,
