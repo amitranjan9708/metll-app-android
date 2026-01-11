@@ -66,10 +66,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // MIGRATION: If user doesn't have isOnboarded flag but has completed onboarding steps,
       // auto-set the flag. This handles users who completed onboarding before this flag existed.
       if (parsedUser.isOnboarded === undefined) {
-        const hasCompletedOnboarding = !!(
-          (parsedUser.situationResponses && parsedUser.situationResponses.length > 0) ||
-          parsedUser.photo
+        // situationResponses can be array or object, so check for both
+        const hasSituationResponses = parsedUser.situationResponses && (
+          Array.isArray(parsedUser.situationResponses) 
+            ? parsedUser.situationResponses.length > 0 
+            : Object.keys(parsedUser.situationResponses).length > 0
         );
+        const hasPhoto = !!parsedUser.photo || !!parsedUser.profilePhoto;
+        
+        const hasCompletedOnboarding = hasSituationResponses || hasPhoto;
         
         if (hasCompletedOnboarding) {
           console.log('📱 Migrating: Setting isOnboarded=true based on existing data');
