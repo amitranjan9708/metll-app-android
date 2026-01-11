@@ -1,11 +1,12 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { LoadingScreen } from '../components/LoadingScreen';
+import { socketService } from '../services/socket';
 
 // Screens
 import { RegisterScreen } from '../screens/RegisterScreen';
@@ -29,6 +30,9 @@ import { CallScreen } from '../screens/CallScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+// Create navigation ref for global navigation
+export const navigationRef = createNavigationContainerRef();
 
 const TabBarIcon = ({ name, focused }: { name: string; focused: boolean }) => {
   const iconName = focused ? name : `${name}-outline`;
@@ -132,6 +136,53 @@ export const AppNavigator = () => {
     hasPhoto: !!user?.photo,
   });
 
+  // Global listener for incoming calls
+  useEffect(() => {
+    // Only listen for calls if user is authenticated and onboarded
+    if (!isAuthenticated || isLoading || (user && !user.isOnboarded)) {
+      return;
+    }
+
+    // Connect socket service
+    socketService.connect();
+
+    // Listen for incoming calls
+    const handleIncomingCall = (callData: {
+      callId: number;
+      matchId: number;
+      channelName: string;
+      callerId: number;
+      callerName: string;
+      callerPhoto: string | null;
+      type: 'voice' | 'video';
+      token: string;
+      appId: string;
+    }) => {
+      console.log('📞 Incoming call received in AppNavigator:', callData);
+      
+      // Navigate to CallScreen if navigation is ready
+      if (navigationRef.isReady()) {
+        (navigationRef as any).navigate('Call', {
+          callId: callData.callId,
+          matchId: callData.matchId,
+          userName: callData.callerName,
+          userPhoto: callData.callerPhoto || 'https://via.placeholder.com/120',
+          callType: callData.type,
+          isIncoming: true,
+          channelName: callData.channelName,
+          callerId: callData.callerId,
+        });
+      }
+    };
+
+    socketService.on('incoming_call', handleIncomingCall);
+
+    // Cleanup
+    return () => {
+      socketService.off('incoming_call', handleIncomingCall);
+    };
+  }, [isAuthenticated, isLoading, user?.isOnboarded]);
+
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -141,7 +192,7 @@ export const AppNavigator = () => {
   const needsOnboarding = isAuthenticated && user && !user.isOnboarded;
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
