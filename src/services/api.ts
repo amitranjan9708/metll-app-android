@@ -3,18 +3,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Profile, MatchData, SwipeResponse, Message, MatchedUser, ChatHostSession, ChatHostMessage } from '../types';
 
 // Configure API base URL
-const LOCAL_IP = '192.168.0.10'; // Your machine's local IP (for mobile devices)
+const LOCAL_IP = '192.168.1.9'; // Computer's LAN IP
 const PRODUCTION_URL = 'https://metll-backend-1.onrender.com/api';
 
 // Set to true for production builds, false for local development
 const USE_PRODUCTION_API = false; // Changed to false for local development
 
 const getBaseUrl = () => {
-    // Check environment variable first
+    // Check environment variable first - PRIORITIZE .ENV AS REQUESTED
     if (process.env.EXPO_PUBLIC_API_URL) {
         const url = process.env.EXPO_PUBLIC_API_URL.trim();
-        // Validate it's a proper URL
+        // Allow both http and https
         if (url.startsWith('http://') || url.startsWith('https://')) {
+            console.log(' Using API URL from .env:', url);
             return url;
         }
     }
@@ -234,7 +235,7 @@ const saveAuthToken = async (token: string): Promise<void> => {
     try {
         await AsyncStorage.setItem('authToken', token);
         console.log('✅ Auth token saved to AsyncStorage');
-        
+
         // Verify it was saved
         const saved = await AsyncStorage.getItem('authToken');
         if (saved === token) {
@@ -252,7 +253,7 @@ export const authApi = {
     /**
      * Register a new user
      */
-    register: async (name: string, phoneNumber: string, password: string): Promise<AuthResponse> => {
+    register: async (name: string, phoneNumber: string, password: string, referralCode?: string): Promise<AuthResponse> => {
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 500));
             const mockResponse: AuthResponse = {
@@ -268,8 +269,8 @@ export const authApi = {
         }
 
         try {
-            const body = { name, phoneNumber, password };
-            logRequest('POST', '/auth/register', { name, phoneNumber });
+            const body = { name, phoneNumber, password, referralCode };
+            logRequest('POST', '/auth/register', { name, phoneNumber, referralCode });
             const startTime = Date.now();
 
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -288,6 +289,8 @@ export const authApi = {
             throw error;
         }
     },
+
+
 
     /**
      * Verify OTP and complete login
@@ -768,7 +771,7 @@ export const authApi = {
         try {
             logRequest('GET', '/user/profile', undefined);
             const startTime = Date.now();
-            
+
             const response = await authFetch('/user/profile', {
                 method: 'GET',
             });
@@ -1409,6 +1412,65 @@ export const hostApi = {
             throw error;
         }
     },
+};
+
+// ==========================================
+// Referral API
+// ==========================================
+
+export const referralApi = {
+    /**
+     * Get referral stats and rewards
+     */
+    getStats: async (): Promise<{ success: boolean; data?: { stats: any, rewards: any[] } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                success: true,
+                data: {
+                    stats: {
+                        referralCode: 'METLL-MOCK123',
+                        totalReferrals: 5,
+                        rewardsEarned: 1,
+                        rewardsUsed: 0,
+                    },
+                    rewards: [
+                        { id: 1, type: 'coffee_date', status: 'available', earnedAt: new Date().toISOString() }
+                    ]
+                }
+            };
+        }
+
+        try {
+            const response = await authFetch('/referrals/stats');
+            return await response.json();
+        } catch (error) {
+            logError('GET', '/referrals/stats', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Redeem a reward
+     */
+    redeemReward: async (): Promise<{ success: boolean; message?: string; data?: { reward: any } }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                success: true,
+                message: 'Reward redeemed!',
+                data: { reward: { id: 1, status: 'used', usedAt: new Date().toISOString() } }
+            };
+        }
+
+        try {
+            const response = await authFetch('/referrals/redeem', { method: 'POST' });
+            return await response.json();
+        } catch (error) {
+            logError('POST', '/referrals/redeem', error);
+            throw error;
+        }
+    }
 };
 
 // Export API URL for Socket.io

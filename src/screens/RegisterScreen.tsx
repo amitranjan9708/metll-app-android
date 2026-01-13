@@ -27,6 +27,7 @@ export const RegisterScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -161,7 +162,7 @@ export const RegisterScreen: React.FC = () => {
       console.log('Registering with phone:', normalizedPhone);
 
       // Call backend to register and send OTP
-      const response = await authApi.register(name.trim(), normalizedPhone, password);
+      const response = await authApi.register(name.trim(), normalizedPhone, password, referralCode.trim() || undefined);
 
       if (!response.success) {
         Alert.alert('Error', response.message || 'Registration failed');
@@ -245,6 +246,15 @@ export const RegisterScreen: React.FC = () => {
                     onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Input
+                    label="Referral Code (Optional)"
+                    placeholder="METLL-CODE"
+                    value={referralCode}
+                    onChangeText={setReferralCode}
+                    autoCapitalize="characters"
                     autoCorrect={false}
                   />
                 </>

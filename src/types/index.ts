@@ -12,6 +12,10 @@ export interface User {
   homeLocation?: LocationDetails;
   situationResponses?: SituationResponse[];
   isOnboarded?: boolean; // Local flag to track onboarding completion
+  referralCode?: string;
+  totalReferrals?: number;
+  rewardsEarned?: number;
+  rewardsUsed?: number;
   createdAt: string;
 }
 

@@ -27,6 +27,7 @@ import { MatchesScreen } from '../screens/MatchesScreen';
 import { ChatScreen } from '../screens/ChatScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { CallScreen } from '../screens/CallScreen';
+import { ReferralScreen } from '../screens/ReferralScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -161,7 +162,7 @@ export const AppNavigator = () => {
     }) => {
       console.log('📞 Incoming call received in AppNavigator:', callData);
       console.log('📞 Navigation ready?', navigationRef.isReady());
-      
+
       // Navigate to CallScreen if navigation is ready
       if (navigationRef.isReady()) {
         console.log('📞 Navigating to CallScreen with params:', {
@@ -273,6 +274,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="PhotoUpload" component={PhotoUploadScreen} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+            <Stack.Screen name="Referral" component={ReferralScreen} />
           </>
         )}
       </Stack.Navigator>

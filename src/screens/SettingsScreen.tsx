@@ -35,15 +35,20 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const settingsItems = [
-    { 
-      icon: 'person-outline', 
+    {
+      icon: 'person-outline',
       title: 'Edit Profile',
       onPress: () => navigation.navigate('EditProfile'),
     },
-    { 
-      icon: 'diamond-outline', 
+    {
+      icon: 'diamond-outline',
       title: 'Subscription',
       onPress: () => navigation.navigate('Subscription'),
+    },
+    {
+      icon: 'gift-outline',
+      title: 'Invite Friends & Earn',
+      onPress: () => navigation.navigate('Referral'),
     },
     { icon: 'notifications-outline', title: 'Notifications' },
     { icon: 'lock-closed-outline', title: 'Privacy & Security' },
@@ -62,8 +67,8 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
             {user?.photo ? (
-              <Image 
-                source={{ uri: user.photo }} 
+              <Image
+                source={{ uri: user.photo }}
                 style={styles.avatarImage}
                 resizeMode="cover"
               />
