@@ -502,16 +502,24 @@ export const authApi = {
             const duration = Date.now() - startTime;
             logResponse('GET', '/auth/me', response.status, data, duration);
 
-            if (response.status === 401 || !data.success) {
-                // User deleted or token invalid
-                return { valid: false, message: data.message || 'Session invalid' };
+            // Only treat 401 as invalid - other errors might be temporary
+            if (response.status === 401) {
+                // Real auth error - token invalid or user deleted
+                return { valid: false, message: data.message || 'Unauthorized - token invalid' };
+            }
+
+            // If response is not successful but not 401, might be server error
+            if (!data.success && response.status !== 401) {
+                console.warn('⚠️ Backend returned error but not 401, assuming valid:', data.message);
+                return { valid: true, message: 'Backend error but not auth-related' };
             }
 
             return { valid: true, user: data.data?.user };
         } catch (error: any) {
             logError('GET', '/auth/me', error);
-            // Network error - don't log out, might just be offline
-            return { valid: true, message: 'Network error, assuming valid' };
+            // Network error - don't log out, might just be offline or connection issue
+            // Return valid=true so user stays logged in
+            return { valid: true, message: `Network error: ${error.message || 'Connection failed'}` };
         }
     },
 

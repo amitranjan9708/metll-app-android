@@ -25,18 +25,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔒 Global 401 received, logging out...');
       handleForceLogout();
     });
-  }, []);
+  }, [handleForceLogout]);
 
   // Force logout when user is deleted or token is invalid
-  const handleForceLogout = async () => {
+  const handleForceLogout = useCallback(async () => {
     try {
+      console.log('🚪 Force logout triggered - clearing auth data');
       await AsyncStorage.multiRemove(['user', 'authToken']);
       setUser(null);
       console.log('🚪 User logged out due to invalid session');
     } catch (error) {
       console.error('Error during force logout:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadLocalUser();
@@ -98,11 +99,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!validation.valid) {
             // User was deleted or token is invalid
             console.warn('❌ Session invalid:', validation.message);
-            // Only logout if it's a real auth error, not a network error
-            if (validation.message && !validation.message.includes('Network')) {
+            // Only logout if it's a REAL 401 auth error (user deleted/token invalid)
+            // Don't logout on network errors, connection issues, or "No token found" (which shouldn't happen here)
+            const isRealAuthError = validation.message && 
+              !validation.message.includes('Network') && 
+              !validation.message.includes('No token') &&
+              !validation.message.includes('offline') &&
+              !validation.message.includes('Failed to fetch');
+            
+            if (isRealAuthError) {
+              console.log('🔒 Real auth error detected, logging out...');
               await handleForceLogout();
             } else {
-              console.log('⚠️ Network error during validation, keeping local user');
+              console.log('⚠️ Non-critical validation issue, keeping local user:', validation.message);
+              // Keep user logged in - might be temporary network issue
             }
           } else {
             console.log('✅ Session valid');
@@ -118,20 +128,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } catch (error: any) {
-          console.log('⚠️ Could not validate session (offline?), using local data:', error.message);
-          // On error, keep local user (might be offline)
-          // Don't logout on network errors
+          console.log('⚠️ Could not validate session (offline/network error?), using local data:', error.message);
+          // On ANY error, keep local user - never logout on errors
+          // This ensures users stay logged in even if backend is down
         }
       } else {
         if (!token) {
-          console.log('📱 No auth token found, skipping validation');
+          console.log('📱 No auth token found, skipping validation - but keeping user logged in');
+          // Even without token, keep user logged in if we have user data
+          // They might need to login again, but don't force logout
         } else {
           console.log('📱 User not yet onboarded, skipping backend validation');
         }
       }
-    } catch (error) {
-      console.error('Error loading local user:', error);
-      // On error, don't clear user - might be a parsing issue
+    } catch (error: any) {
+      console.error('❌ Error loading local user:', error);
+      // On error, don't clear user - might be a parsing issue or AsyncStorage issue
+      // If we have user data but can't parse it, try to keep user logged in
+      // Only clear if it's a critical error
+      if (error.message && error.message.includes('JSON')) {
+        // JSON parse error - data might be corrupted, but don't logout
+        console.warn('⚠️ JSON parse error, but keeping user state to prevent logout');
+      }
+      // Always set loading to false even on error
     } finally {
       setIsLoading(false);
     }
