@@ -20,6 +20,7 @@ import { theme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SituationQuestion, SituationResponse, SituationCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { navigationRef } from '../navigation/AppNavigator';
 
 type RouteParams = {
     SituationAnswer: {
@@ -149,8 +150,16 @@ export const SituationAnswerScreen: React.FC = () => {
             // Mark onboarding as complete - this sets the local isOnboarded flag
             await completeOnboarding();
             
-            // Navigation will automatically switch to Main app due to auth state change
-            // (user.isOnboarded is now true, so needsOnboarding becomes false)
+            // Explicitly navigate to Main screen after a short delay to ensure state updates
+            // Use global navigationRef since we're switching stacks
+            setTimeout(() => {
+                if (navigationRef.isReady()) {
+                    navigationRef.reset({
+                        index: 0,
+                        routes: [{ name: 'Main' }],
+                    });
+                }
+            }, 100);
         } catch (error) {
             Alert.alert('Error', 'Failed to save your answers. Please try again.');
         }

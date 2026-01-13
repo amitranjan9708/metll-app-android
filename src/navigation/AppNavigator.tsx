@@ -273,6 +273,9 @@ export const AppNavigator = () => {
             />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="PhotoUpload" component={PhotoUploadScreen} />
+            <Stack.Screen name="SituationIntro" component={SituationIntroScreen} />
+            <Stack.Screen name="SituationSelection" component={SituationSelectionScreen} />
+            <Stack.Screen name="SituationAnswer" component={SituationAnswerScreen} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
             <Stack.Screen name="Referral" component={ReferralScreen} />
           </>
