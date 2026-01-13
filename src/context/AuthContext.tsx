@@ -19,14 +19,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Register global 401 handler
-  useEffect(() => {
-    setOnUnauthorizedCallback(() => {
-      console.log('🔒 Global 401 received, logging out...');
-      handleForceLogout();
-    });
-  }, [handleForceLogout]);
-
   // Force logout when user is deleted or token is invalid
   const handleForceLogout = useCallback(async () => {
     try {
@@ -38,6 +30,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error during force logout:', error);
     }
   }, []);
+
+  // Register global 401 handler
+  useEffect(() => {
+    setOnUnauthorizedCallback(() => {
+      console.log('🔒 Global 401 received, logging out...');
+      handleForceLogout();
+    });
+  }, [handleForceLogout]);
 
   useEffect(() => {
     loadLocalUser();

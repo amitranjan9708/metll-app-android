@@ -16,6 +16,7 @@ import { Card } from '../components/Card';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { navigationRef } from '../navigation/AppNavigator';
 
 const { width } = Dimensions.get('window');
 
@@ -111,15 +112,28 @@ export const SituationIntroScreen: React.FC = () => {
                     text: 'Skip for Now',
                     style: 'destructive',
                     onPress: async () => {
-                        // Save empty responses locally
-                        await updateUser({ 
-                            situationResponses: [] 
-                        });
-                        
-                        // Mark onboarding as complete - sets local isOnboarded flag
-                        await completeOnboarding();
-                        
-                        // Navigation will automatically switch to Main due to auth state change
+                        try {
+                            // Save empty responses locally
+                            await updateUser({ 
+                                situationResponses: [] 
+                            });
+                            
+                            // Mark onboarding as complete - sets local isOnboarded flag
+                            await completeOnboarding();
+                            
+                            // Explicitly navigate to Main screen after a short delay to ensure state updates
+                            // Use global navigationRef since we're switching stacks
+                            setTimeout(() => {
+                                if (navigationRef.isReady()) {
+                                    navigationRef.reset({
+                                        index: 0,
+                                        routes: [{ name: 'Main' }],
+                                    });
+                                }
+                            }, 100);
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to skip questions. Please try again.');
+                        }
                     },
                 },
             ]
