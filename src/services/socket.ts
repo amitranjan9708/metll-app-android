@@ -71,6 +71,32 @@ class SocketService {
             console.log('📞 Call declined:', data);
             this.notify('call_declined', data);
         });
+
+        // AI Host event handlers
+        this.socket.on('host_opt_in', (data) => {
+            console.log('🤖 Host opt-in:', data);
+            this.notify('host_opt_in', data);
+        });
+
+        this.socket.on('host_message', (data) => {
+            console.log('🤖 Host message:', data);
+            this.notify('host_message', data);
+        });
+
+        this.socket.on('host_answer', (data) => {
+            console.log('🤖 Host answer:', data);
+            this.notify('host_answer', data);
+        });
+
+        this.socket.on('host_handoff', (data) => {
+            console.log('🤖 Host handoff:', data);
+            this.notify('host_handoff', data);
+        });
+
+        this.socket.on('host_exited', (data) => {
+            console.log('🤖 Host exited:', data);
+            this.notify('host_exited', data);
+        });
     }
 
     // Disconnect socket

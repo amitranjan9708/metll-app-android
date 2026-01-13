@@ -89,14 +89,21 @@ export const RegisterScreen: React.FC = () => {
   };
 
   const handleLogin = async () => {
-    if (!validateForm()) return;
+    console.log('🔐 handleLogin called');
+    if (!validateForm()) {
+      console.log('❌ Form validation failed');
+      return;
+    }
 
+    console.log('✅ Form validated, starting login...');
     setLoading(true);
     try {
       const normalizedPhone = normalizePhoneNumber(phone.trim());
-      console.log('Logging in with phone:', normalizedPhone);
+      console.log('📞 Logging in with phone:', normalizedPhone);
+      console.log('🌐 API Base URL:', process.env.EXPO_PUBLIC_API_URL || 'Using default');
 
       const response = await authApi.login(normalizedPhone, password);
+      console.log('📥 Login response received:', response);
 
       if (!response.success || !response.data) {
         Alert.alert('Error', response.message || 'Login failed');
@@ -177,9 +184,12 @@ export const RegisterScreen: React.FC = () => {
   };
 
   const handleSubmit = () => {
+    console.log('🔘 Button clicked, isLoginMode:', isLoginMode);
     if (isLoginMode) {
+      console.log('🔐 Calling handleLogin...');
       handleLogin();
     } else {
+      console.log('📝 Calling handleRegister...');
       handleRegister();
     }
   };

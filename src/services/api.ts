@@ -1,13 +1,13 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Profile, MatchData, SwipeResponse, Message, MatchedUser } from '../types';
+import { Profile, MatchData, SwipeResponse, Message, MatchedUser, ChatHostSession, ChatHostMessage } from '../types';
 
 // Configure API base URL
-const LOCAL_IP = '192.168.0.10'; // Your machine's local IP
+const LOCAL_IP = '192.168.0.10'; // Your machine's local IP (for mobile devices)
 const PRODUCTION_URL = 'https://metll-backend-1.onrender.com/api';
 
 // Set to true for production builds, false for local development
-const USE_PRODUCTION_API = true;
+const USE_PRODUCTION_API = false; // Changed to false for local development
 
 const getBaseUrl = () => {
     // Check environment variable first
@@ -24,10 +24,16 @@ const getBaseUrl = () => {
         return PRODUCTION_URL;
     }
 
+    // For web platform, use localhost; for mobile, use local IP
+    if (Platform.OS === 'web') {
+        return 'http://localhost:3000/api';
+    }
+
     return `http://${LOCAL_IP}:3000/api`;
 };
 
 const API_BASE_URL = getBaseUrl();
+console.log('🌐 API Base URL configured:', API_BASE_URL, '(Platform:', Platform.OS, ')');
 
 // Set to true to use mock data (for development without backend)
 // Set to false when backend is running
@@ -227,9 +233,18 @@ export interface AuthResponse {
 const saveAuthToken = async (token: string): Promise<void> => {
     try {
         await AsyncStorage.setItem('authToken', token);
-        console.log('Auth token saved');
+        console.log('✅ Auth token saved to AsyncStorage');
+        
+        // Verify it was saved
+        const saved = await AsyncStorage.getItem('authToken');
+        if (saved === token) {
+            console.log('✅ Verified auth token persisted correctly');
+        } else {
+            console.error('❌ Auth token verification failed - token mismatch');
+        }
     } catch (error) {
-        console.error('Error saving auth token:', error);
+        console.error('❌ Error saving auth token:', error);
+        throw error; // Re-throw to ensure caller knows it failed
     }
 };
 
@@ -343,6 +358,8 @@ export const authApi = {
 
         try {
             const body = { phoneNumber, password };
+            console.log('🌐 Making login request to:', `${API_BASE_URL}/auth/login`);
+            console.log('📤 Request body:', { phoneNumber: phoneNumber.substring(0, 5) + '***' });
             logRequest('POST', '/auth/login', { phoneNumber });
             const startTime = Date.now();
 
@@ -352,8 +369,10 @@ export const authApi = {
                 body: JSON.stringify(body),
             });
 
+            console.log('📥 Login response status:', response.status);
             const data = await response.json();
             const duration = Date.now() - startTime;
+            console.log('📥 Login response data:', data);
             logResponse('POST', '/auth/login', response.status, data, duration);
 
             if (data.success && data.data?.token) {
@@ -1237,6 +1256,148 @@ export const callsApi = {
             return data.data;
         } catch (error) {
             console.error('End call error:', error);
+            throw error;
+        }
+    },
+};
+
+// ==========================================
+// AI Host API
+// ==========================================
+
+export const hostApi = {
+    /**
+     * Get AI host session for a match
+     */
+    getHostSession: async (matchId: number): Promise<{ success: boolean; data?: ChatHostSession }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                success: true,
+                data: {
+                    id: 1,
+                    chatRoomId: matchId,
+                    matchId,
+                    status: 'pending',
+                    currentStage: 'STAGE_0',
+                    user1OptIn: false,
+                    user2OptIn: false,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                },
+            };
+        }
+
+        try {
+            const response = await authFetch(`/host/${matchId}`);
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Get host session error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Opt-in to AI host
+     */
+    optIn: async (matchId: number): Promise<{ success: boolean; data?: ChatHostSession }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return { success: true };
+        }
+
+        try {
+            const response = await authFetch(`/host/${matchId}/opt-in`, {
+                method: 'POST',
+            });
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Opt-in error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Opt-out of AI host
+     */
+    optOut: async (matchId: number): Promise<{ success: boolean }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return { success: true };
+        }
+
+        try {
+            const response = await authFetch(`/host/${matchId}/opt-out`, {
+                method: 'POST',
+            });
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Opt-out error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Submit answer to host question
+     */
+    submitAnswer: async (matchId: number, answer: string, questionId?: string): Promise<{ success: boolean }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return { success: true };
+        }
+
+        try {
+            const response = await authFetch(`/host/${matchId}/answer`, {
+                method: 'POST',
+                body: JSON.stringify({ answer, questionId }),
+            });
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Submit answer error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get host messages
+     */
+    getHostMessages: async (matchId: number): Promise<{ success: boolean; data?: ChatHostMessage[] }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return { success: true, data: [] };
+        }
+
+        try {
+            const response = await authFetch(`/host/${matchId}/messages`);
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Get host messages error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Exit host session
+     */
+    exitHost: async (matchId: number): Promise<{ success: boolean; message?: string }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return { success: true };
+        }
+
+        try {
+            const response = await authFetch(`/host/${matchId}/exit`, {
+                method: 'POST',
+            });
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Exit host error:', error);
             throw error;
         }
     },

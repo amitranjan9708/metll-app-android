@@ -8,6 +8,7 @@ import {
   TextStyle,
   Animated,
   View,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/useTheme';
@@ -42,7 +43,7 @@ export const Button: React.FC<ButtonProps> = ({
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
       toValue: 0.96,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       friction: 8,
       tension: 100,
     }).start();
@@ -51,7 +52,7 @@ export const Button: React.FC<ButtonProps> = ({
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       friction: 8,
       tension: 40,
     }).start();

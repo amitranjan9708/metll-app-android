@@ -15,13 +15,14 @@ import {
 import { useTheme } from '../theme/useTheme';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { chatApi, swipeApi } from '../services/api'; // Added swipeApi
+import { chatApi, swipeApi, hostApi } from '../services/api';
 import { socketService } from '../services/socket';
-import { Message, User } from '../types';
+import { Message, User, ChatHostSession, ChatHostMessage } from '../types';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { Alert } from 'react-native';
+import { HostOptInBanner, HostChatView } from '../components';
 
 interface ChatParams {
     matchId: number;
@@ -41,11 +42,16 @@ export const ChatScreen: React.FC = () => {
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [hostSession, setHostSession] = useState<ChatHostSession | null>(null);
+    const [hostMessages, setHostMessages] = useState<ChatHostMessage[]>([]);
+    const [showOptIn, setShowOptIn] = useState(false);
+    const [waitingForOptIn, setWaitingForOptIn] = useState(false);
 
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
         loadChat();
+        loadHostSession();
 
         // Connect and join socket room
         socketService.connect();
@@ -53,31 +59,61 @@ export const ChatScreen: React.FC = () => {
 
         // Listen for new messages
         const handleNewMessage = (newMessage: Message) => {
-            // Only add if it belongs to this chat
-            // In a real app we'd verify the matchId/chatRoomId match
-            // Here assuming backend only pushes relevant messages or we filter
-            // The backend emits 'new_message' to the room `chat:${chatRoomId}`
-            // We need to ensure we don't duplicate
-
-            // For now, simpler check: avoid duplicates by ID if possible, 
-            // or just append. 
             setMessages(prev => {
                 const exists = prev.some(m => m.id === newMessage.id);
                 if (exists) return prev;
                 return [...prev, { ...newMessage, isOwn: newMessage.senderId === Number(user?.id) }];
             });
 
-            // Scroll to bottom
             setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
         };
 
+        // Listen for host events
+        const handleHostOptIn = (data: any) => {
+            if (data.sessionId) {
+                loadHostSession();
+            }
+        };
+
+        const handleHostMessage = (data: { message: ChatHostMessage; sessionId: number }) => {
+            setHostMessages(prev => {
+                const exists = prev.some(m => m.id === data.message.id);
+                if (exists) return prev;
+                return [...prev, data.message];
+            });
+            setShowOptIn(false);
+            setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+        };
+
+        const handleHostHandoff = () => {
+            // Host has stepped back, allow normal chat
+            setHostSession(prev => prev ? { ...prev, status: 'completed' } : null);
+        };
+
+        const handleHostExited = () => {
+            // Host exited, clear everything and show regular chat
+            setHostSession(null); // Clear session completely
+            setHostMessages([]); // Clear host messages
+            // Reload regular chat messages
+            loadChat();
+        };
+
         socketService.on('new_message', handleNewMessage);
+        socketService.on('host_opt_in', handleHostOptIn);
+        socketService.on('host_message', handleHostMessage);
+        socketService.on('host_handoff', handleHostHandoff);
+        socketService.on('host_exited', handleHostExited);
 
         return () => {
             socketService.off('new_message', handleNewMessage);
-            // Leave chat logic if needed
+            socketService.off('host_opt_in', handleHostOptIn);
+            socketService.off('host_message', handleHostMessage);
+            socketService.off('host_handoff', handleHostHandoff);
+            socketService.off('host_exited', handleHostExited);
         };
     }, [matchId]);
 
@@ -94,19 +130,164 @@ export const ChatScreen: React.FC = () => {
         }
     };
 
+    const loadHostSession = async () => {
+        try {
+            const response = await hostApi.getHostSession(matchId);
+            console.log('Host session response:', response);
+            if (response.success && response.data) {
+                const session = response.data;
+                setHostSession(session);
+
+                console.log('Host session loaded:', {
+                    status: session.status,
+                    user1OptIn: session.user1OptIn,
+                    user2OptIn: session.user2OptIn,
+                    isUser1: session.isUser1,
+                });
+
+                // Check if we should show opt-in
+                if (session.status === 'pending' || session.status === 'exited') {
+                    // Show opt-in if user hasn't opted in yet, or if session was exited (allow re-entry)
+                    const hasOptedIn = session.isUser1 ? session.user1OptIn : session.user2OptIn;
+                    console.log('Should show opt-in?', !hasOptedIn && !waitingForOptIn, 'status:', session.status);
+                    if (!hasOptedIn && !waitingForOptIn) {
+                        setShowOptIn(true);
+                    } else {
+                        setShowOptIn(false);
+                    }
+                } else if (!session.status || session.status === null) {
+                    // Session just created, show opt-in
+                    setShowOptIn(true);
+                } else {
+                    setShowOptIn(false);
+                }
+
+                // Load host messages if session is active or completed
+                if (session.status === 'active' || session.status === 'completed') {
+                    const messagesResponse = await hostApi.getHostMessages(matchId);
+                    if (messagesResponse.success && messagesResponse.data) {
+                        setHostMessages(messagesResponse.data);
+                    }
+                } else if (session.status === 'exited') {
+                    // Host exited, clear host messages and show regular chat
+                    setHostMessages([]);
+                }
+            } else {
+                // If no session exists yet, we might want to show opt-in
+                // But for now, let's wait for session to be created on first API call
+                console.log('No host session found yet');
+            }
+        } catch (error) {
+            console.error('Failed to load host session:', error);
+            // On error, don't show opt-in to avoid confusion
+            setShowOptIn(false);
+        }
+    };
+
+    const handleOptIn = async () => {
+        try {
+            setWaitingForOptIn(true);
+            const response = await hostApi.optIn(matchId);
+            if (response.success) {
+                setShowOptIn(false);
+                await loadHostSession();
+            }
+        } catch (error) {
+            console.error('Failed to opt-in:', error);
+            Alert.alert("Error", "Failed to opt-in to host.");
+        } finally {
+            setWaitingForOptIn(false);
+        }
+    };
+
+    const handleOptOut = async () => {
+        try {
+            await hostApi.optOut(matchId);
+            setShowOptIn(false);
+            setHostSession(null);
+        } catch (error) {
+            console.error('Failed to opt-out:', error);
+        }
+    };
+
+    const handleHostAnswer = async (answer: string, questionId?: string) => {
+        try {
+            await hostApi.submitAnswer(matchId, answer, questionId);
+            // Add user's answer to host messages for immediate UI update
+            const userAnswer: ChatHostMessage = {
+                id: Date.now(),
+                sessionId: hostSession?.id || 0,
+                senderType: hostSession?.isUser1 ? 'user1' : 'user2',
+                senderId: Number(user?.id),
+                content: answer,
+                messageType: 'text',
+                createdAt: new Date().toISOString(),
+            };
+            setHostMessages(prev => [...prev, userAnswer]);
+            setInputText('');
+            setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+        } catch (error) {
+            console.error('Failed to submit answer:', error);
+            Alert.alert("Error", "Failed to send answer.");
+        }
+    };
+
+    const handleExitHost = async () => {
+        Alert.alert(
+            "Exit Host Mode",
+            "Are you sure you want to exit host mode? You'll continue chatting normally. You can restart host mode anytime.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Exit",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await hostApi.exitHost(matchId);
+                            // Clear host messages immediately to show regular chat
+                            setHostMessages([]);
+                            // Reload regular chat messages
+                            await loadChat();
+                            // Reload host session to get the exited status (so opt-in banner can show again)
+                            await loadHostSession();
+                        } catch (error) {
+                            console.error('Failed to exit host:', error);
+                            Alert.alert("Error", "Failed to exit host mode.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleSend = async () => {
         if (!inputText.trim()) return;
 
         const content = inputText.trim();
+        const textToSend = content;
         setInputText('');
         setSending(true);
 
-        // Optimistic update
-        const tempId = Date.now(); // Temp ID
+        // If host session is active, send as host answer
+        if (hostSession && hostSession.status === 'active') {
+            try {
+                await handleHostAnswer(textToSend);
+            } catch (error) {
+                console.error('Failed to send host answer:', error);
+            } finally {
+                setSending(false);
+            }
+            return;
+        }
+
+        // Regular message
+        const tempId = Date.now();
         const optimisticMessage: Message = {
             id: tempId,
             senderId: Number(user?.id) || 0,
-            content: content,
+            content: textToSend,
             type: 'text',
             createdAt: new Date().toISOString(),
             isRead: false,
@@ -116,19 +297,15 @@ export const ChatScreen: React.FC = () => {
         setMessages(prev => [...prev, optimisticMessage]);
 
         try {
-            // Try via Socket first
-            socketService.sendMessage(matchId, content);
+            socketService.sendMessage(matchId, textToSend);
             setSending(false);
         } catch (error) {
             console.error('Failed to send message via socket, trying HTTP:', error);
-            // Fallback to HTTP
             try {
-                const msg = await chatApi.sendMessage(matchId, content);
-                // Replace optimistic message with real one
+                const msg = await chatApi.sendMessage(matchId, textToSend);
                 setMessages(prev => prev.map(m => m.id === tempId ? { ...msg, isOwn: true } : m));
             } catch (httpError) {
                 console.error('Failed to send message:', httpError);
-                // Remove optimistic message or show error
             } finally {
                 setSending(false);
             }
@@ -279,6 +456,92 @@ export const ChatScreen: React.FC = () => {
         );
     };
 
+    const renderHostMessage = ({ item }: { item: ChatHostMessage }) => {
+        const isHost = item.senderType === 'host';
+        const isOwn = item.senderType !== 'host' && item.senderId === Number(user?.id);
+
+        if (isHost) {
+            return (
+                <View style={styles.hostMessageContainer}>
+                    <View style={styles.hostBubble}>
+                        <Text style={styles.hostIcon}>🤖</Text>
+                        <Text style={styles.hostMessageText}>{item.content}</Text>
+                        {item.metadata?.options && (
+                            <View style={styles.optionsContainer}>
+                                {item.metadata.options.map((option: string, idx: number) => (
+                                    <TouchableOpacity
+                                        key={idx}
+                                        style={styles.hostOptionButton}
+                                        onPress={() => handleHostAnswer(option, item.metadata?.questionId)}
+                                    >
+                                        <Text style={styles.optionText}>{option}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+            );
+        }
+
+        return (
+            <View style={[
+                styles.messageContainer,
+                isOwn ? styles.messageOwn : styles.messageOther
+            ]}>
+                {!isOwn && (
+                    <Image
+                        source={{ uri: userPhoto || 'https://via.placeholder.com/30' }}
+                        style={styles.messageAvatar}
+                    />
+                )}
+                <View style={[
+                    styles.bubble,
+                    isOwn ? styles.bubbleOwn : styles.bubbleOther
+                ]}>
+                    <Text style={[
+                        styles.messageText,
+                        isOwn ? styles.textOwn : styles.textOther
+                    ]}>
+                        {item.content}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderOptInBanner = () => {
+        // Show banner if:
+        // 1. showOptIn is true (user hasn't opted in yet, or session was exited)
+        // 2. OR if no messages exist and no active host session (new match)
+        const shouldShow = showOptIn || (
+            messages.length === 0 &&
+            (!hostSession || hostSession.status === 'pending' || hostSession.status === 'exited') &&
+            !hostSession?.user1OptIn &&
+            !hostSession?.user2OptIn
+        );
+
+        if (!shouldShow) return null;
+
+        // Check if partner has opted in
+        const partnerOptedIn = hostSession ? (
+            hostSession.isUser1 ? hostSession.user2OptIn : hostSession.user1OptIn
+        ) : false;
+
+        return (
+            <HostOptInBanner
+                onOptIn={handleOptIn}
+                onOptOut={() => {
+                    setShowOptIn(false);
+                    handleOptOut();
+                }}
+                isLoading={waitingForOptIn}
+                partnerName={userName}
+                partnerOptedIn={partnerOptedIn}
+            />
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -308,6 +571,23 @@ export const ChatScreen: React.FC = () => {
                     <Ionicons name="call" size={22} color={theme.colors.primary} />
                 </TouchableOpacity>
 
+                {hostSession && hostSession.status === 'active' && (
+                    <TouchableOpacity
+                        style={styles.exitHostButton}
+                        onPress={handleExitHost}
+                    >
+                        <Ionicons name="close-circle" size={24} color={theme.colors.error || '#ff4444'} />
+                    </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                    style={styles.hostButton}
+                    onPress={() => {
+                        // Force show opt-in or reload host session
+                        loadHostSession();
+                    }}
+                >
+                    <Text style={styles.hostButtonText}>🤖</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.optionButton} onPress={handleUnmatch}>
                     <Ionicons name="ellipsis-vertical" size={24} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
@@ -318,14 +598,36 @@ export const ChatScreen: React.FC = () => {
                     <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
             ) : (
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    renderItem={renderMessage}
-                    keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={styles.messageList}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                />
+                <View style={styles.chatContent}>
+                    {renderOptInBanner()}
+                    {hostSession && hostSession.status === 'active' ? (
+                        <HostChatView
+                            session={hostSession}
+                            messages={hostMessages}
+                            userName={userName}
+                            userPhoto={userPhoto}
+                            currentUserId={user?.id}
+                            onAnswer={handleHostAnswer}
+                            onExit={handleExitHost}
+                        />
+                    ) : (
+                        <FlatList
+                            ref={flatListRef}
+                            data={messages}
+                            renderItem={renderMessage}
+                            keyExtractor={(item, index) => `${item.id || index}-msg`}
+                            contentContainerStyle={styles.messageList}
+                            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                            ListEmptyComponent={
+                                messages.length === 0 && !showOptIn ? (
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>Start the conversation!</Text>
+                                    </View>
+                                ) : null
+                            }
+                        />
+                    )}
+                </View>
             )}
 
             <KeyboardAvoidingView
@@ -339,11 +641,12 @@ export const ChatScreen: React.FC = () => {
 
                     <TextInput
                         style={styles.input}
-                        placeholder="Message..."
+                        placeholder={hostSession && hostSession.status === 'active' ? "Answer the host..." : "Message..."}
                         placeholderTextColor={theme.colors.textSecondary}
                         value={inputText}
                         onChangeText={setInputText}
                         multiline
+                        editable={!waitingForOptIn}
                     />
 
                     <TouchableOpacity
@@ -406,6 +709,30 @@ const getStyles = (theme: any) => StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    chatContent: {
+        flex: 1,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingTop: 100,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: theme.colors.textSecondary,
+    },
+    hostButton: {
+        padding: 8,
+        marginRight: 4,
+    },
+    hostButtonText: {
+        fontSize: 22,
+    },
+    exitHostButton: {
+        padding: 8,
+        marginRight: 4,
     },
     messageList: {
         padding: 16,
@@ -495,5 +822,87 @@ const getStyles = (theme: any) => StyleSheet.create({
     },
     sendButtonDisabled: {
         backgroundColor: theme.colors.border,
+    },
+    optInBanner: {
+        backgroundColor: theme.colors.backgroundCard,
+        padding: 16,
+        margin: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.primary + '40',
+    },
+    optInTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: theme.colors.textPrimary,
+        marginBottom: 8,
+    },
+    optInSubtitle: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        marginBottom: 12,
+    },
+    optInButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    optInButton: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    optInButtonYes: {
+        backgroundColor: theme.colors.primary,
+    },
+    optInButtonNo: {
+        backgroundColor: theme.colors.border,
+    },
+    optInButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    hostMessageContainer: {
+        marginBottom: 16,
+        alignItems: 'center',
+    },
+    hostBubble: {
+        backgroundColor: theme.colors.backgroundCard,
+        padding: 16,
+        borderRadius: 20,
+        maxWidth: '85%',
+        borderWidth: 1,
+        borderColor: theme.colors.primary + '30',
+    },
+    hostIcon: {
+        fontSize: 24,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    hostMessageText: {
+        fontSize: 16,
+        color: theme.colors.textPrimary,
+        lineHeight: 22,
+        marginBottom: 8,
+    },
+    optionsContainer: {
+        marginTop: 8,
+        gap: 8,
+    },
+    hostOptionButton: {
+        backgroundColor: theme.colors.primary + '20',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+    },
+    optionText: {
+        fontSize: 14,
+        color: theme.colors.primary,
+        fontWeight: '600',
+        textAlign: 'center',
     },
 });

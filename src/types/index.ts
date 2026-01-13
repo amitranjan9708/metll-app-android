@@ -206,3 +206,44 @@ export interface IncomingCallData {
   token: string;
   appId: string;
 }
+
+// ==========================================
+// AI Host Types
+// ==========================================
+
+export interface ChatHostSession {
+  id: number;
+  chatRoomId: number;
+  matchId: number;
+  status: 'pending' | 'active' | 'completed' | 'declined' | 'exited';
+  currentStage?: string;
+  user1OptIn: boolean;
+  user2OptIn: boolean;
+  stageData?: any;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  messages?: ChatHostMessage[];
+  currentUserId?: number;
+  isUser1?: boolean;
+}
+
+export interface ChatHostMessage {
+  id: number;
+  sessionId: number;
+  senderType: 'host' | 'user1' | 'user2';
+  senderId?: number;
+  content: string;
+  messageType: 'text' | 'question' | 'button' | 'game_prompt';
+  metadata?: {
+    stage?: string;
+    question?: string;
+    questionType?: string;
+    options?: string[];
+    gameType?: string;
+    isHandoff?: boolean;
+    [key: string]: any;
+  };
+  createdAt: string;
+}

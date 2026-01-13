@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 import { callsApi } from '../services/api';
 import { socketService } from '../services/socket';
+import { useAuth } from '../context/AuthContext';
 // Optional Agora import - will be null if not linked
 let createAgoraRtcEngine: any = null;
 let IRtcEngine: any = null;
@@ -23,17 +24,35 @@ let ChannelProfileType: any = null;
 let ClientRoleType: any = null;
 let RtcSurfaceView: any = null;
 
-try {
-    const agoraModule = require('react-native-agora');
-    createAgoraRtcEngine = agoraModule.default || agoraModule.createAgoraRtcEngine;
-    IRtcEngine = agoraModule.IRtcEngine;
-    ChannelProfileType = agoraModule.ChannelProfileType;
-    ClientRoleType = agoraModule.ClientRoleType;
-    RtcSurfaceView = agoraModule.RtcSurfaceView;
-} catch (e) {
-    console.warn('Agora SDK not available:', e);
-    // Create placeholder components
+let isAgoraAvailable = false;
+// Only load Agora on native platforms, not on web
+if (Platform.OS !== 'web') {
+    try {
+        const agoraModule = require('react-native-agora');
+        createAgoraRtcEngine = agoraModule.default || agoraModule.createAgoraRtcEngine;
+        IRtcEngine = agoraModule.IRtcEngine;
+        ChannelProfileType = agoraModule.ChannelProfileType;
+        ClientRoleType = agoraModule.ClientRoleType;
+        RtcSurfaceView = agoraModule.RtcSurfaceView;
+        
+        if (createAgoraRtcEngine && ChannelProfileType && ClientRoleType) {
+            isAgoraAvailable = true;
+            console.log('✅ Agora SDK loaded successfully');
+        } else {
+            console.warn('⚠️ Agora SDK partially loaded - some exports missing');
+        }
+    } catch (e) {
+        console.error('❌ Agora SDK not available:', e);
+        console.error('❌ Error details:', e instanceof Error ? e.message : String(e));
+        // Create placeholder components
+        RtcSurfaceView = ({ style, canvas }: any) => null;
+        isAgoraAvailable = false;
+    }
+} else {
+    // Web platform - create placeholder
     RtcSurfaceView = ({ style, canvas }: any) => null;
+    isAgoraAvailable = false;
+    console.log('ℹ️ Agora SDK skipped on web platform');
 }
 
 interface CallParams {
@@ -54,6 +73,7 @@ export const CallScreen: React.FC = () => {
     const styles = getStyles(theme);
     const navigation = useNavigation();
     const route = useRoute();
+    const { user } = useAuth();
     const params = route.params as CallParams;
 
     const {
@@ -132,60 +152,107 @@ export const CallScreen: React.FC = () => {
     // Initialize Agora engine
     const initAgoraEngine = async (agoraAppId: string) => {
         try {
-            if (!createAgoraRtcEngine || !agoraAppId) {
-                console.warn('Agora SDK not available, using mock mode');
+            console.log('🔧 Initializing Agora engine...', {
+                isAgoraAvailable,
+                hasCreateFunction: !!createAgoraRtcEngine,
+                hasAppId: !!agoraAppId,
+                appIdLength: agoraAppId?.length || 0,
+            });
+
+            if (!isAgoraAvailable || !createAgoraRtcEngine || !agoraAppId) {
+                console.warn('⚠️ Agora SDK not available, using mock mode');
+                console.warn('⚠️ Audio will NOT work in mock mode - Agora SDK must be properly linked');
+                Alert.alert(
+                    'Agora SDK Not Available',
+                    'The Agora SDK is not properly linked. Audio/video calls will not work. Please rebuild the app with proper native linking.',
+                    [{ text: 'OK' }]
+                );
                 // In mock mode, simulate connection after a delay
                 setTimeout(() => {
                     setCallStatus('connected');
                     setIsJoined(true);
                 }, 2000);
-                return true;
+                return false; // Return false to indicate mock mode
             }
 
+            console.log('✅ Creating Agora RTC engine...');
             agoraEngineRef.current = createAgoraRtcEngine();
             const engine = agoraEngineRef.current;
 
+            if (!engine) {
+                throw new Error('Failed to create Agora engine instance');
+            }
+
+            console.log('✅ Registering Agora event handlers...');
             engine.registerEventHandler({
-                onJoinChannelSuccess: () => {
-                    console.log('Successfully joined channel');
+                onJoinChannelSuccess: (channel: string, uid: number, elapsed: number) => {
+                    console.log('✅ Successfully joined channel:', { channel, uid, elapsed });
                     setIsJoined(true);
+                    setCallStatus('connected');
                 },
-                onUserJoined: (_connection: any, uid: number) => {
-                    console.log('Remote user joined:', uid);
+                onUserJoined: (connection: any, uid: number) => {
+                    console.log('👤 Remote user joined:', { uid, connection });
                     setRemoteUid(uid);
                     setCallStatus('connected');
                 },
-                onUserOffline: (_connection: any, uid: number) => {
-                    console.log('Remote user left:', uid);
+                onUserOffline: (connection: any, uid: number, reason: number) => {
+                    console.log('👤 Remote user left:', { uid, reason });
                     setRemoteUid(null);
                     handleEndCall();
                 },
-                onError: (err: any) => {
-                    console.error('Agora error:', err);
+                onError: (err: number, msg: string) => {
+                    console.error('❌ Agora error:', { err, msg });
+                    Alert.alert('Call Error', `Agora error: ${msg} (code: ${err})`);
+                },
+                onAudioRouteChanged: (routing: number) => {
+                    console.log('🔊 Audio route changed:', routing);
+                },
+                onRemoteAudioStateChanged: (uid: number, state: number, reason: number, elapsed: number) => {
+                    console.log('🔊 Remote audio state changed:', { uid, state, reason, elapsed });
                 },
             });
 
-            engine.initialize({
+            console.log('✅ Initializing Agora engine with App ID...');
+            const initResult = engine.initialize({
                 appId: agoraAppId,
                 channelProfile: ChannelProfileType.ChannelProfileCommunication,
             });
 
+            if (initResult !== 0) {
+                throw new Error(`Agora initialization failed with code: ${initResult}`);
+            }
+
+            console.log('✅ Enabling audio...');
+            engine.enableAudio();
+            
+            // Set default audio route to speaker for voice calls
+            if (callType === 'voice') {
+                engine.setEnableSpeakerphone(true);
+                setIsSpeakerOn(true);
+            }
+
             if (callType === 'video') {
+                console.log('✅ Enabling video...');
                 engine.enableVideo();
                 engine.startPreview();
             }
 
-            engine.enableAudio();
-
+            console.log('✅ Agora engine initialized successfully');
             return true;
-        } catch (e) {
-            console.error('Failed to initialize Agora:', e);
+        } catch (e: any) {
+            console.error('❌ Failed to initialize Agora:', e);
+            console.error('❌ Error stack:', e?.stack);
+            Alert.alert(
+                'Agora Initialization Failed',
+                `Failed to initialize Agora SDK: ${e?.message || String(e)}\n\nAudio/video will not work.`,
+                [{ text: 'OK' }]
+            );
             // Fallback to mock mode
             setTimeout(() => {
                 setCallStatus('connected');
                 setIsJoined(true);
             }, 2000);
-            return true;
+            return false;
         }
     };
 
@@ -194,11 +261,25 @@ export const CallScreen: React.FC = () => {
         try {
             const engine = agoraEngineRef.current;
             if (!engine) {
-                // Mock mode - already handled in initAgoraEngine
-                return true;
+                console.warn('⚠️ No Agora engine available - mock mode');
+                return false;
             }
 
-            await engine.joinChannel(agoraToken, channel, uid, {
+            if (!agoraToken || !channel) {
+                console.error('❌ Missing token or channel name:', { hasToken: !!agoraToken, hasChannel: !!channel });
+                Alert.alert('Call Error', 'Missing call credentials. Cannot join channel.');
+                return false;
+            }
+
+            console.log('🔌 Joining Agora channel...', {
+                channel,
+                uid,
+                hasToken: !!agoraToken,
+                tokenLength: agoraToken.length,
+                callType,
+            });
+
+            const joinResult = await engine.joinChannel(agoraToken, channel, uid, {
                 clientRoleType: ClientRoleType.ClientRoleBroadcaster,
                 publishMicrophoneTrack: true,
                 publishCameraTrack: callType === 'video',
@@ -206,11 +287,19 @@ export const CallScreen: React.FC = () => {
                 autoSubscribeVideo: callType === 'video',
             });
 
+            if (joinResult !== 0) {
+                console.error('❌ Failed to join channel, error code:', joinResult);
+                Alert.alert('Call Error', `Failed to join call channel (error: ${joinResult})`);
+                return false;
+            }
+
+            console.log('✅ Successfully joined channel');
             return true;
-        } catch (e) {
-            console.error('Failed to join channel:', e);
-            // In mock mode, connection is already simulated
-            return true;
+        } catch (e: any) {
+            console.error('❌ Failed to join channel:', e);
+            console.error('❌ Error details:', e?.message || String(e));
+            Alert.alert('Call Error', `Failed to join call: ${e?.message || String(e)}`);
+            return false;
         }
     };
 
@@ -342,7 +431,15 @@ export const CallScreen: React.FC = () => {
             // Initialize and join Agora
             const initialized = await initAgoraEngine(response.appId);
             if (initialized) {
-                await joinChannel(response.token, response.channelName, 0);
+                // Use user ID as Agora UID (must match the UID used in token generation)
+                const agoraUid = user?.id ? Number(user.id) : 0;
+                console.log('🔌 Joining channel with UID:', agoraUid);
+                const joined = await joinChannel(response.token, response.channelName, agoraUid);
+                if (!joined) {
+                    console.error('❌ Failed to join Agora channel');
+                }
+            } else {
+                console.warn('⚠️ Agora not initialized, call will not have audio');
             }
         } catch (error: any) {
             console.error('Failed to initiate call:', error);
@@ -364,8 +461,19 @@ export const CallScreen: React.FC = () => {
             // Initialize Agora with provided credentials
             const initialized = await initAgoraEngine(appId);
             if (initialized && token && channelName) {
-                await joinChannel(token, channelName, 0);
-                setCallStatus('connected');
+                // Use user ID as Agora UID (must match the UID used in token generation)
+                const agoraUid = user?.id ? Number(user.id) : 0;
+                console.log('🔌 Answering call, joining channel with UID:', agoraUid);
+                const joined = await joinChannel(token, channelName, agoraUid);
+                if (joined) {
+                    // Status will be set to 'connected' by onJoinChannelSuccess event
+                    console.log('✅ Successfully joined channel');
+                } else {
+                    console.error('❌ Failed to join Agora channel');
+                    Alert.alert('Call Error', 'Failed to join call channel. Audio may not work.');
+                }
+            } else {
+                console.warn('⚠️ Agora not initialized or missing credentials');
             }
         } catch (error: any) {
             console.error('Failed to answer call:', error);

@@ -6,4 +6,5 @@ export { Card } from './Card';
 export { VerificationBadge } from './VerificationBadge';
 export { VideoRecorder } from './VideoRecorder';
 export { ThemeSelector } from './ThemeSelector';
-
+export { HostOptInBanner } from './HostOptInBanner';
+export { HostChatView } from './HostChatView';

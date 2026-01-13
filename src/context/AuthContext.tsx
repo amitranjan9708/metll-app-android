@@ -45,13 +45,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Load user from local storage - PRIMARY source of truth for onboarding status
   const loadLocalUser = async () => {
     try {
-      const userData = await AsyncStorage.getItem('user');
+      // Check both user data and token
+      const [userData, token] = await Promise.all([
+        AsyncStorage.getItem('user'),
+        AsyncStorage.getItem('authToken')
+      ]);
+      
+      console.log('📱 Loading user data:', {
+        hasUserData: !!userData,
+        hasToken: !!token
+      });
       
       if (!userData) {
         // No local user, stay logged out
         console.log('📱 No local user data found');
         setIsLoading(false);
         return;
+      }
+
+      // If we have user but no token, something went wrong - but keep user for now
+      if (!token) {
+        console.warn('⚠️ User data found but no auth token. User may need to login again.');
       }
 
       let parsedUser = JSON.parse(userData);
@@ -71,20 +85,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.setItem('user', JSON.stringify(parsedUser));
       }
       
-      // Set user from local storage - LOCAL DATA IS PRIMARY
+      // Set user from local storage IMMEDIATELY - LOCAL DATA IS PRIMARY
       setUser(parsedUser);
       
-      // Only validate session if user is already onboarded
+      // Only validate session if user is already onboarded AND we have a token
       // This prevents overwriting local onboarding data
-      if (parsedUser.isOnboarded) {
-        console.log('🔍 User is onboarded, validating session with backend...');
+      if (parsedUser.isOnboarded && token) {
+        console.log('🔍 User is onboarded and has token, validating session with backend...');
         try {
           const validation = await authApi.validateSession();
           
           if (!validation.valid) {
             // User was deleted or token is invalid
             console.warn('❌ Session invalid:', validation.message);
-            await handleForceLogout();
+            // Only logout if it's a real auth error, not a network error
+            if (validation.message && !validation.message.includes('Network')) {
+              await handleForceLogout();
+            } else {
+              console.log('⚠️ Network error during validation, keeping local user');
+            }
           } else {
             console.log('✅ Session valid');
             // Merge backend data but PRESERVE local isOnboarded flag
@@ -98,15 +117,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
             }
           }
-        } catch (error) {
-          console.log('⚠️ Could not validate session (offline?), using local data');
+        } catch (error: any) {
+          console.log('⚠️ Could not validate session (offline?), using local data:', error.message);
           // On error, keep local user (might be offline)
+          // Don't logout on network errors
         }
       } else {
-        console.log('📱 User not yet onboarded, skipping backend validation');
+        if (!token) {
+          console.log('📱 No auth token found, skipping validation');
+        } else {
+          console.log('📱 User not yet onboarded, skipping backend validation');
+        }
       }
     } catch (error) {
       console.error('Error loading local user:', error);
+      // On error, don't clear user - might be a parsing issue
     } finally {
       setIsLoading(false);
     }
@@ -116,12 +141,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (userData: User) => {
     console.log('AuthContext login called with:', userData);
     try {
+      // Save user data to AsyncStorage
       await AsyncStorage.setItem('user', JSON.stringify(userData));
-      console.log('User saved to AsyncStorage');
+      console.log('✅ User saved to AsyncStorage');
+      
+      // Verify it was saved
+      const saved = await AsyncStorage.getItem('user');
+      if (saved) {
+        console.log('✅ Verified user data persisted');
+      } else {
+        console.error('❌ Failed to verify user data persistence');
+      }
+      
+      // Also verify token exists
+      const token = await AsyncStorage.getItem('authToken');
+      if (token) {
+        console.log('✅ Auth token found in storage');
+      } else {
+        console.warn('⚠️ No auth token found in storage after login');
+      }
+      
       setUser(userData);
-      console.log('User state updated, isAuthenticated will be true');
+      console.log('✅ User state updated, isAuthenticated will be true');
     } catch (error) {
-      console.error('Error saving user:', error);
+      console.error('❌ Error saving user:', error);
       throw error;
     }
   }, []);
