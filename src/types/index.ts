@@ -112,10 +112,12 @@ export interface Profile {
   gender?: string;
   images: string[];
   profilePhoto?: string;
+  additionalPhotos?: string[];
   isVerified: boolean;
   latitude?: number;
   longitude?: number;
   distance?: string;
+  situationResponses?: SituationResponse[];
 }
 
 export interface MatchedUser {
@@ -135,6 +137,10 @@ export interface MatchData {
   chatRoomId?: number;
   lastMessage?: Message;
   unreadCount?: number;
+  // Sponsored Coffee Date
+  coffeeTicket?: boolean;
+  coffeeTicketCafe?: string;
+  coffeeTicketExpiry?: string;
 }
 
 export interface Message {

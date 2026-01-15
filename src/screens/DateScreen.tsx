@@ -1,57 +1,54 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     Dimensions,
-    Animated,
-    PanResponder,
     TouchableOpacity,
     Image,
     ActivityIndicator,
-    Alert
+    Alert,
+    ScrollView,
+    RefreshControl,
+    Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/useTheme';
 import { Ionicons } from '@expo/vector-icons';
-import { Card } from '../components/Card';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { swipeApi } from '../services/api';
-import { Profile, MatchData } from '../types';
+import { Profile, MatchData, SituationResponse } from '../types';
 import { MatchModal } from '../components/MatchModal';
 import { useAuth } from '../context/AuthContext';
+import { SITUATIONS } from './SituationSelectionScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export const DateScreen: React.FC = () => {
     const theme = useTheme();
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
 
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
-    
-    // Use refs to access latest values in panResponder callbacks
-    const profilesRef = useRef(profiles);
-    const currentIndexRef = useRef(currentIndex);
-    
-    // Keep refs in sync with state
-    useEffect(() => {
-        profilesRef.current = profiles;
-    }, [profiles]);
-    
-    useEffect(() => {
-        currentIndexRef.current = currentIndex;
-    }, [currentIndex]);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Filter State (mocked for now)
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        ageMin: 18,
+        ageMax: 35,
+        distance: 50, // km
+        gender: 'all', // 'all', 'male', 'female'
+    });
 
     // Match Modal State
     const [isMatchModalVisible, setIsMatchModalVisible] = useState(false);
     const [currentMatch, setCurrentMatch] = useState<MatchData | null>(null);
 
-    const position = useRef(new Animated.ValueXY()).current;
-
-    // Load profiles when screen comes into focus
     useFocusEffect(
         useCallback(() => {
             if (profiles.length === 0) {
@@ -68,10 +65,15 @@ export const DateScreen: React.FC = () => {
             setCurrentIndex(0);
         } catch (error) {
             console.error('Failed to load profiles:', error);
-            // Optionally show error toast
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadProfiles();
     };
 
     const handleRefresh = async () => {
@@ -90,133 +92,48 @@ export const DateScreen: React.FC = () => {
         }
     };
 
-    // Rotation interpolation based on movement
-    const rotate = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
-        outputRange: ['-10deg', '0deg', '10deg'],
-        extrapolate: 'clamp',
-    });
+    const handleLike = async (likedElement?: string) => {
+        const currentProfile = profiles[currentIndex];
+        if (!currentProfile) return;
 
-    // Like opacity (swiping right)
-    const likeOpacity = position.x.interpolate({
-        inputRange: [0, width / 4],
-        outputRange: [0, 1],
-        extrapolate: 'clamp',
-    });
+        try {
+            const response = await swipeApi.swipe(currentProfile.id, 'like');
+            console.log('🔥 SWIPE RESPONSE:', JSON.stringify(response, null, 2));
 
-    // Nope opacity (swiping left)
-    const nopeOpacity = position.x.interpolate({
-        inputRange: [-width / 4, 0],
-        outputRange: [1, 0],
-        extrapolate: 'clamp',
-    });
+            // Check both possible response structures
+            const isMatch = response.success && response.data?.isMatch;
+            const match = response.data?.match;
 
-    const nextCardOpacity = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
-        outputRange: [1, 0.5, 1],
-        extrapolate: 'clamp',
-    });
+            console.log('🎯 isMatch:', isMatch, 'match:', match);
 
-    const nextCardScale = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
-        outputRange: [1, 0.96, 1],
-        extrapolate: 'clamp',
-    });
-
-    // Create pan responder that uses refs to access latest values
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => {
-                // Only allow pan responder if there are profiles and we haven't reached the end
-                return currentIndexRef.current < profilesRef.current.length && profilesRef.current.length > 0;
-            },
-            onPanResponderMove: (_, gesture) => {
-                // Only allow movement if we have a valid profile
-                if (currentIndexRef.current < profilesRef.current.length) {
-                    position.setValue({ x: gesture.dx, y: gesture.dy });
-                }
-            },
-            onPanResponderRelease: (_, gesture) => {
-                // Only process swipe if we have a valid profile
-                if (currentIndexRef.current >= profilesRef.current.length) {
-                    resetPosition();
-                    return;
-                }
-                if (gesture.dx > 120) {
-                    forceSwipe('right');
-                } else if (gesture.dx < -120) {
-                    forceSwipe('left');
-                } else {
-                    resetPosition();
-                }
-            },
-        })
-    ).current;
-
-    const forceSwipe = (direction: 'right' | 'left') => {
-        // Check if we have a valid profile before swiping
-        if (currentIndex >= profiles.length) {
-            resetPosition();
-            return;
+            if (isMatch && match) {
+                setCurrentMatch(match as MatchData);
+                setIsMatchModalVisible(true);
+            }
+            moveToNextProfile();
+        } catch (error) {
+            console.error('Like failed:', error);
         }
-        const x = direction === 'right' ? width + 100 : -width - 100;
-        Animated.timing(position, {
-            toValue: { x, y: 0 },
-            duration: 250,
-            useNativeDriver: false,
-        }).start(() => onSwipeComplete(direction));
     };
 
-    const onSwipeComplete = async (direction: 'right' | 'left') => {
-        // Use a closure to capture the current index at the time of swipe
-        setCurrentIndex(prevIndex => {
-            // Check if we have a valid profile at the current index
-            if (prevIndex >= profiles.length) {
-                resetPosition();
-                return prevIndex; // Don't increment if we're already at the end
-            }
+    const handlePass = async () => {
+        const currentProfile = profiles[currentIndex];
+        if (!currentProfile) return;
 
-            const currentProfile = profiles[prevIndex];
-
-            // Guard: Check if profile exists
-            if (!currentProfile || !currentProfile.id) {
-                console.warn('Cannot swipe: currentProfile is undefined or missing id', {
-                    index: prevIndex,
-                    profilesLength: profiles.length,
-                    profile: currentProfile
-                });
-                resetPosition();
-                return prevIndex; // Don't increment if profile is invalid
-            }
-
-            // API Call - use the captured profile
-            swipeApi.swipe(currentProfile.id, direction === 'right' ? 'like' : 'pass')
-                .then((response) => {
-                    // Check if we have a match
-                    if (response.success && response.data?.isMatch && response.data?.match) {
-                        // Show Match Modal
-                        setCurrentMatch(response.data.match as MatchData);
-                        setIsMatchModalVisible(true);
-                    }
-                })
-                .catch((error) => {
-                    console.error('Swipe failed:', error);
-                });
-
-            // Return incremented index only if profile was valid
-            return prevIndex + 1;
-        });
-
-        // Reset position for next card
-        position.setValue({ x: 0, y: 0 });
+        try {
+            await swipeApi.swipe(currentProfile.id, 'pass');
+            moveToNextProfile();
+        } catch (error) {
+            console.error('Pass failed:', error);
+        }
     };
 
-    const resetPosition = () => {
-        Animated.spring(position, {
-            toValue: { x: 0, y: 0 },
-            friction: 4,
-            useNativeDriver: false,
-        }).start();
+    const moveToNextProfile = () => {
+        if (currentIndex < profiles.length - 1) {
+            setCurrentIndex(prev => prev + 1);
+        } else {
+            setCurrentIndex(profiles.length);
+        }
     };
 
     const handleSendMessage = () => {
@@ -225,162 +142,221 @@ export const DateScreen: React.FC = () => {
             navigation.navigate('Chat', {
                 matchId: currentMatch.id,
                 userName: currentMatch.matchedUser.name,
-                userPhoto: currentMatch.matchedUser.profilePhoto || currentMatch.matchedUser.images[0]
+                userPhoto: currentMatch.matchedUser.profilePhoto || currentMatch.matchedUser.images?.[0]
             });
         }
     };
 
-    const styles = getStyles(theme);
+    const getAllPhotos = (profile: Profile): string[] => {
+        const photos: string[] = [];
+        if (profile.profilePhoto) photos.push(profile.profilePhoto);
+        if (profile.additionalPhotos) photos.push(...profile.additionalPhotos);
+        if (profile.images) photos.push(...profile.images);
+        return photos.filter((photo, index, self) => self.indexOf(photo) === index);
+    };
 
-    const renderNoMoreProfiles = () => {
-        if (loading) return (
-            <View style={styles.noMoreContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-            </View>
-        );
+    const getQuestionById = (questionId: number) => {
+        return SITUATIONS.find(s => s.id === questionId);
+    };
 
+    const styles = getStyles(theme, insets);
+    const currentProfile = profiles[currentIndex];
+
+    if (loading && profiles.length === 0) {
         return (
-            <View style={styles.noMoreContainer}>
-                <View style={[styles.noMoreIcon, { backgroundColor: theme.colors.primary + '20' }]}>
-                    <Ionicons name="people" size={50} color={theme.colors.primary} />
+            <View style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={styles.loadingText}>Finding people near you...</Text>
                 </View>
-                <Text style={[styles.noMoreText, { color: theme.colors.textPrimary }]}>
-                    No more profiles nearby
-                </Text>
-                <Text style={[styles.noMoreSubtext, { color: theme.colors.textSecondary }]}>
-                    Check back later for more matches!
-                </Text>
-                <Button title="Refresh" onPress={handleRefresh} variant="outline" style={{ marginTop: 20 }} />
             </View>
         );
-    };
+    }
 
-    const renderCards = () => {
-        if (currentIndex >= profiles.length) {
-            return renderNoMoreProfiles();
-        }
+    if (currentIndex >= profiles.length || !currentProfile) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.emptyContainer}>
+                    <View style={styles.emptyIcon}>
+                        <Ionicons name="search" size={48} color={theme.colors.textMuted} />
+                    </View>
+                    <Text style={styles.emptyTitle}>No more profiles</Text>
+                    <Text style={styles.emptySubtitle}>Check back later for new people near you</Text>
+                    <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
+                        <Text style={styles.refreshBtnText}>Refresh</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
 
-        return profiles.map((item, index) => {
-            if (index < currentIndex) return null;
+    const allPhotos = getAllPhotos(currentProfile);
+    const situationResponses = currentProfile.situationResponses || [];
 
-            // Logic for stacking cards
-            if (index === currentIndex) {
-                return (
-                    <Animated.View
-                        key={item.id}
-                        style={[
-                            styles.cardContainer,
-                            {
-                                transform: [
-                                    { translateX: position.x },
-                                    { translateY: position.y },
-                                    { rotate: rotate },
-                                ],
-                                zIndex: 10,
-                            }
-                        ]}
-                        {...panResponder.panHandlers}
-                    >
-                        <Card style={styles.card} variant="default">
-                            <Image
-                                source={{ uri: item.profilePhoto || item.images[0] || 'https://via.placeholder.com/400' }}
-                                style={styles.cardImage}
-                            />
+    // Build profile elements with randomized order (except first photo + info)
+    const profileElements: any[] = [];
 
-                            <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.8)']}
-                                style={styles.cardGradient}
-                            >
-                                <View style={styles.profileHeader}>
-                                    <Text style={styles.cardName}>{item.name}, {item.age}</Text>
-                                    {item.isVerified && (
-                                        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" style={{ marginLeft: 8 }} />
-                                    )}
-                                </View>
-                                <Text style={styles.cardDistance}>{item.distance || 'Nearby'}</Text>
-                                <Text style={styles.cardBio} numberOfLines={3}>{item.bio}</Text>
-                            </LinearGradient>
+    // Always show first photo at top
+    if (allPhotos[0]) {
+        profileElements.push({ type: 'photo', url: allPhotos[0], index: 0 });
+    }
 
-                            {/* OVERLAY LABELS */}
-                            <Animated.View style={[styles.likeLabel, { opacity: likeOpacity }]}>
-                                <Text style={styles.likeText}>LIKE</Text>
-                            </Animated.View>
+    // Add profile info after first photo
+    profileElements.push({ type: 'info' });
 
-                            <Animated.View style={[styles.nopeLabel, { opacity: nopeOpacity }]}>
-                                <Text style={styles.nopeText}>NOPE</Text>
-                            </Animated.View>
-                        </Card>
-                    </Animated.View>
-                );
-            } else if (index === currentIndex + 1) {
-                // Next card in stack
-                return (
-                    <Animated.View
-                        key={item.id}
-                        style={[
-                            styles.cardContainer,
-                            {
-                                opacity: nextCardOpacity,
-                                transform: [{ scale: nextCardScale }],
-                                zIndex: 5,
-                            }
-                        ]}
-                    >
-                        <Card style={styles.card} variant="default">
-                            <Image
-                                source={{ uri: item.profilePhoto || item.images[0] || 'https://via.placeholder.com/400' }}
-                                style={styles.cardImage}
-                            />
-                            <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.8)']}
-                                style={styles.cardGradient}
-                            >
-                                <Text style={styles.cardName}>{item.name}, {item.age}</Text>
-                                <Text style={styles.cardDistance}>{item.distance || 'Nearby'}</Text>
-                                <Text style={styles.cardBio} numberOfLines={2}>{item.bio}</Text>
-                            </LinearGradient>
-                        </Card>
-                    </Animated.View>
-                );
-            } else {
-                return null;
-            }
-        }).reverse(); // Reverse so top card is last rendered (on top)
-    };
+    // Create array of remaining photos and prompts to shuffle
+    const shuffleElements: any[] = [];
+
+    // Add remaining photos
+    allPhotos.slice(1).forEach((url, idx) => {
+        shuffleElements.push({ type: 'photo', url, index: idx + 1 });
+    });
+
+    // Add prompts (max 3)
+    situationResponses.slice(0, 3).forEach((resp, idx) => {
+        shuffleElements.push({ type: 'prompt', data: resp, index: idx });
+    });
+
+    // Shuffle the elements using Fisher-Yates algorithm
+    for (let i = shuffleElements.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffleElements[i], shuffleElements[j]] = [shuffleElements[j], shuffleElements[i]];
+    }
+
+    // Add shuffled elements to profile
+    profileElements.push(...shuffleElements);
 
     return (
-        <LinearGradient
-            colors={[theme.colors.background, theme.colors.backgroundLight]}
-            style={styles.container}
-        >
-            <View style={styles.content}>
-                {renderCards()}
-            </View>
-
-            {currentIndex < profiles.length && (
-                <View style={styles.footer}>
+        <View style={styles.container}>
+            {/* Header with Filters */}
+            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                <Text style={styles.headerTitle}>Discover</Text>
+                <View style={styles.filterRow}>
                     <TouchableOpacity
-                        style={[styles.actionBtn, styles.passBtn]}
-                        onPress={() => forceSwipe('left')}
+                        style={styles.filterChip}
+                        onPress={() => setShowFilters(true)}
                     >
-                        <Ionicons name="close" size={30} color="#EF5350" />
+                        <Ionicons name="options-outline" size={16} color="#1A1A1A" />
+                        <Text style={styles.filterChipText}>Filters</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.actionBtn, styles.superLikeBtn]}
-                        onPress={() => { }}
-                    >
-                        <Ionicons name="star" size={24} color="#3B82F6" />
+                    <TouchableOpacity style={styles.filterChip}>
+                        <Text style={styles.filterChipText}>{filters.ageMin}-{filters.ageMax} yrs</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.actionBtn, styles.likeBtn]}
-                        onPress={() => forceSwipe('right')}
-                    >
-                        <Ionicons name="heart" size={30} color="#4CAF50" />
+                    <TouchableOpacity style={styles.filterChip}>
+                        <Text style={styles.filterChipText}>{filters.distance} km</Text>
                     </TouchableOpacity>
                 </View>
-            )}
+            </View>
+
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.colors.primary}
+                    />
+                }
+            >
+                {profileElements.map((element, idx) => {
+                    if (element.type === 'photo') {
+                        return (
+                            <View key={`photo-${idx}`} style={styles.photoCard}>
+                                <Image
+                                    source={{ uri: element.url }}
+                                    style={styles.profilePhoto}
+                                    resizeMode="cover"
+                                />
+                                <TouchableOpacity
+                                    style={styles.photoLikeBtn}
+                                    onPress={() => handleLike(`photo-${element.index}`)}
+                                >
+                                    <Ionicons name="heart-outline" size={24} color="#1A1A1A" />
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    }
+
+                    if (element.type === 'info') {
+                        return (
+                            <View key="info" style={styles.infoCard}>
+                                <View style={styles.nameRow}>
+                                    <Text style={styles.profileName}>{currentProfile.name}</Text>
+                                    {currentProfile.age && (
+                                        <Text style={styles.profileAge}>, {currentProfile.age}</Text>
+                                    )}
+                                    {currentProfile.isVerified && (
+                                        <View style={styles.verifiedBadge}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                                        </View>
+                                    )}
+                                </View>
+
+                                {currentProfile.bio && (
+                                    <Text style={styles.profileBio}>{currentProfile.bio}</Text>
+                                )}
+
+                                <View style={styles.detailsRow}>
+                                    {(currentProfile as any).school && (
+                                        <View style={styles.detailChip}>
+                                            <Ionicons name="book-outline" size={14} color="#6B6B6B" />
+                                            <Text style={styles.detailChipText}>{(currentProfile as any).school.name}</Text>
+                                        </View>
+                                    )}
+                                    {(currentProfile as any).college && (
+                                        <View style={styles.detailChip}>
+                                            <Ionicons name="school-outline" size={14} color="#6B6B6B" />
+                                            <Text style={styles.detailChipText}>{(currentProfile as any).college.name}</Text>
+                                        </View>
+                                    )}
+                                    {(currentProfile as any).office && (
+                                        <View style={styles.detailChip}>
+                                            <Ionicons name="briefcase-outline" size={14} color="#6B6B6B" />
+                                            <Text style={styles.detailChipText}>{(currentProfile as any).office.name}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        );
+                    }
+
+                    if (element.type === 'prompt') {
+                        const question = getQuestionById(element.data.questionId);
+                        if (!question) return null;
+
+                        return (
+                            <View key={`prompt-${idx}`} style={styles.promptCard}>
+                                <Text style={styles.promptQuestion}>{question.question}</Text>
+                                <Text style={styles.promptAnswer}>{element.data.answer}</Text>
+                                <TouchableOpacity
+                                    style={styles.promptLikeBtn}
+                                    onPress={() => handleLike(`prompt-${element.index}`)}
+                                >
+                                    <Ionicons name="heart-outline" size={22} color="#1A1A1A" />
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    }
+
+                    return null;
+                })}
+
+                {/* Bottom spacing for action buttons */}
+                <View style={{ height: 120 }} />
+            </ScrollView>
+
+            {/* Fixed Action Buttons */}
+            <View style={styles.actionContainer}>
+                <TouchableOpacity style={styles.passBtn} onPress={handlePass}>
+                    <Ionicons name="close" size={28} color="#1A1A1A" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike()}>
+                    <Ionicons name="heart" size={28} color="#fff" />
+                </TouchableOpacity>
+            </View>
 
             <MatchModal
                 visible={isMatchModalVisible}
@@ -389,183 +365,398 @@ export const DateScreen: React.FC = () => {
                 onSendMessage={handleSendMessage}
                 onKeepSwiping={() => setIsMatchModalVisible(false)}
             />
-        </LinearGradient>
+
+            {/* Filter Modal */}
+            <Modal
+                visible={showFilters}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowFilters(false)}
+            >
+                <View style={styles.filterModal}>
+                    <View style={styles.filterModalHeader}>
+                        <Text style={styles.filterModalTitle}>Filters</Text>
+                        <TouchableOpacity onPress={() => setShowFilters(false)}>
+                            <Ionicons name="close" size={28} color="#1A1A1A" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.filterModalContent}>
+                        {/* Age Range */}
+                        <View style={styles.filterSection}>
+                            <Text style={styles.filterLabel}>Age Range</Text>
+                            <View style={styles.filterValue}>
+                                <Text style={styles.filterValueText}>{filters.ageMin} - {filters.ageMax} years</Text>
+                            </View>
+                            <Text style={styles.filterHint}>Slider coming soon</Text>
+                        </View>
+
+                        {/* Distance */}
+                        <View style={styles.filterSection}>
+                            <Text style={styles.filterLabel}>Maximum Distance</Text>
+                            <View style={styles.filterValue}>
+                                <Text style={styles.filterValueText}>{filters.distance} km</Text>
+                            </View>
+                            <Text style={styles.filterHint}>Slider coming soon</Text>
+                        </View>
+
+                        {/* Gender */}
+                        <View style={styles.filterSection}>
+                            <Text style={styles.filterLabel}>Show Me</Text>
+                            <View style={styles.genderOptions}>
+                                {['all', 'male', 'female'].map((g) => (
+                                    <TouchableOpacity
+                                        key={g}
+                                        style={[
+                                            styles.genderOption,
+                                            filters.gender === g && styles.genderOptionActive
+                                        ]}
+                                        onPress={() => setFilters({ ...filters, gender: g })}
+                                    >
+                                        <Text style={[
+                                            styles.genderOptionText,
+                                            filters.gender === g && styles.genderOptionTextActive
+                                        ]}>
+                                            {g.charAt(0).toUpperCase() + g.slice(1)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </ScrollView>
+
+                    <TouchableOpacity
+                        style={styles.applyFilterBtn}
+                        onPress={() => {
+                            setShowFilters(false);
+                            Alert.alert('Applied', 'Filters applied (mock)');
+                        }}
+                    >
+                        <Text style={styles.applyFilterBtnText}>Apply Filters</Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
+        </View>
     );
 };
 
-// Simplified Button component for internal use if needed, 
-// but reusing the one imported from components is better.
-const Button = ({ title, onPress, variant = 'primary', style }: any) => {
-    const theme = useTheme();
-    const isOutline = variant === 'outline';
-    return (
-        <TouchableOpacity
-            onPress={onPress}
-            style={[
-                {
-                    paddingVertical: 12,
-                    paddingHorizontal: 24,
-                    borderRadius: 24,
-                    backgroundColor: isOutline ? 'transparent' : theme.colors.primary,
-                    borderWidth: isOutline ? 1 : 0,
-                    borderColor: theme.colors.primary,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                },
-                style
-            ]}
-        >
-            <Text style={{
-                color: isOutline ? theme.colors.primary : '#fff',
-                fontWeight: '600'
-            }}>
-                {title}
-            </Text>
-        </TouchableOpacity>
-    );
-};
-
-const getStyles = (theme: any) => StyleSheet.create({
+const getStyles = (theme: any, insets: any) => StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#FAFAFA',
     },
-    content: {
+    loadingContainer: {
         flex: 1,
-        alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 20,
+        alignItems: 'center',
+        gap: 16,
     },
-    noMoreContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
+    loadingText: {
+        fontSize: 16,
+        color: theme.colors.textSecondary,
+    },
+    emptyContainer: {
         flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
     },
-    noMoreIcon: {
+    emptyIcon: {
         width: 100,
         height: 100,
         borderRadius: 50,
+        backgroundColor: theme.colors.backgroundCard,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
     },
-    noMoreText: {
-        ...theme.typography.heading,
-        textAlign: 'center',
+    emptyTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: theme.colors.textPrimary,
         marginBottom: 8,
     },
-    noMoreSubtext: {
-        ...theme.typography.body,
+    emptySubtitle: {
+        fontSize: 16,
+        color: theme.colors.textSecondary,
         textAlign: 'center',
         marginBottom: 24,
     },
-    cardContainer: {
-        width: width - 32,
-        height: height * 0.65,
-        position: 'absolute',
-        borderRadius: 20,
+    refreshBtn: {
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        backgroundColor: theme.colors.primary,
+        borderRadius: 25,
     },
-    card: {
-        flex: 1,
-        borderRadius: 20,
-        overflow: 'hidden',
-        padding: 0, // Override default padding
-        borderWidth: 0,
+    refreshBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
-    cardImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
+    // Header
+    header: {
+        backgroundColor: '#FAFAFA',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
-    cardGradient: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 180,
-        justifyContent: 'flex-end',
-        padding: 20,
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginBottom: 12,
     },
-    profileHeader: {
+    filterRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    filterChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 4,
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
     },
-    cardName: {
-        ...theme.typography.heading,
-        color: '#fff',
-        fontSize: 28,
-    },
-    cardDistance: {
-        ...theme.typography.caption,
-        color: '#fff',
-        opacity: 0.8,
-        marginTop: 0,
-    },
-    cardBio: {
-        ...theme.typography.body,
-        color: '#fff',
-        marginTop: 8,
-        fontSize: 16,
-        lineHeight: 22,
+    filterChipText: {
+        fontSize: 14,
+        color: '#1A1A1A',
         fontWeight: '500',
     },
-    likeLabel: {
-        position: 'absolute',
-        top: 50,
-        left: 40,
-        borderWidth: 4,
-        borderColor: '#4CAF50',
-        paddingHorizontal: 10,
-        borderRadius: 8,
-        transform: [{ rotate: '-30deg' }],
+    scrollView: {
+        flex: 1,
     },
-    likeText: {
-        color: '#4CAF50',
-        fontSize: 32,
-        fontWeight: '800',
+    scrollContent: {
+        paddingHorizontal: 12,
+        paddingTop: 12,
     },
-    nopeLabel: {
-        position: 'absolute',
-        top: 50,
-        right: 40,
-        borderWidth: 4,
-        borderColor: '#EF5350',
-        paddingHorizontal: 10,
-        borderRadius: 8,
-        transform: [{ rotate: '30deg' }],
+    // Photo Cards
+    photoCard: {
+        marginBottom: 12,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#fff',
+        position: 'relative',
     },
-    nopeText: {
-        color: '#EF5350',
-        fontSize: 32,
-        fontWeight: '800',
-    },
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingBottom: 40,
-        gap: 20,
-    },
-    actionBtn: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
+    profilePhoto: {
+        width: '100%',
+        aspectRatio: 0.75,
         backgroundColor: theme.colors.backgroundCard,
-        ...theme.shadows.md,
     },
-    passBtn: {
-        // border: '1px solid #EF5350',
-    },
-    likeBtn: {
-        // border: '1px solid #4CAF50',
-    },
-    superLikeBtn: {
+    photoLikeBtn: {
+        position: 'absolute',
+        bottom: 16,
+        right: 16,
         width: 48,
         height: 48,
         borderRadius: 24,
-        marginTop: 20, // Sit lower
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...theme.shadows.md,
+    },
+    // Info Card
+    infoCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 12,
+    },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    profileName: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    profileAge: {
+        fontSize: 28,
+        fontWeight: '400',
+        color: '#6B6B6B',
+    },
+    verifiedBadge: {
+        marginLeft: 8,
+    },
+    profileBio: {
+        fontSize: 16,
+        color: '#4A4A4A',
+        lineHeight: 24,
+        marginBottom: 16,
+    },
+    detailsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    detailChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    detailChipText: {
+        fontSize: 14,
+        color: '#4A4A4A',
+    },
+    // Prompt Cards - Modern Design
+    promptCard: {
+        backgroundColor: '#1A1A1A',
+        borderRadius: 20,
+        padding: 24,
+        marginBottom: 12,
+        position: 'relative',
+        minHeight: 160,
+    },
+    promptQuestion: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: 'rgba(255,255,255,0.6)',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    promptAnswer: {
+        fontSize: 22,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        lineHeight: 30,
+        paddingRight: 50,
+    },
+    promptLikeBtn: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Action Buttons
+    actionContainer: {
+        position: 'absolute',
+        bottom: insets.bottom + 10,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 24,
+    },
+    passBtn: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#1A1A1A',
+        ...theme.shadows.md,
+    },
+    likeBtn: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#1A1A1A',
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...theme.shadows.md,
+    },
+    // Filter Modal
+    filterModal: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    filterModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    filterModalTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    filterModalContent: {
+        flex: 1,
+        padding: 20,
+    },
+    filterSection: {
+        marginBottom: 32,
+    },
+    filterLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1A1A1A',
+        marginBottom: 12,
+    },
+    filterValue: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 8,
+    },
+    filterValueText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1A1A1A',
+    },
+    filterHint: {
+        fontSize: 13,
+        color: '#9B9B9B',
+        fontStyle: 'italic',
+    },
+    genderOptions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    genderOption: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: 'rgba(0,0,0,0.1)',
+        alignItems: 'center',
+    },
+    genderOptionActive: {
+        backgroundColor: '#1A1A1A',
+        borderColor: '#1A1A1A',
+    },
+    genderOptionText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1A1A1A',
+    },
+    genderOptionTextActive: {
+        color: '#fff',
+    },
+    applyFilterBtn: {
+        backgroundColor: '#1A1A1A',
+        marginHorizontal: 20,
+        marginBottom: 40,
+        paddingVertical: 18,
+        borderRadius: 30,
+        alignItems: 'center',
+    },
+    applyFilterBtnText: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#fff',
     },
 });

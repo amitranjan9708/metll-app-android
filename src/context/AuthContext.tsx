@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 import { authApi, setOnUnauthorizedCallback } from '../services/api';
+import { cache } from '../services/cache';
 
 interface AuthContextType {
   user: User | null;
@@ -190,6 +191,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try {
+      // Clear all cache first
+      await cache.clearAll();
+      
       // Clear all user-related data from local storage
       const keysToRemove = [
         'user',
@@ -203,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       await AsyncStorage.multiRemove([...keysToRemove, ...chatKeys]);
       setUser(null);
-      console.log('✅ All local data cleared on logout');
+      console.log('✅ All local data and cache cleared on logout');
     } catch (error) {
       console.error('Error logging out:', error);
     }

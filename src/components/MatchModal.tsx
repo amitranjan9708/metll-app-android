@@ -86,7 +86,7 @@ export const MatchModal: React.FC<MatchModalProps> = ({
         >
             <View style={styles.overlay}>
                 <LinearGradient
-                    colors={[theme.colors.primary + 'E6', theme.colors.secondary + 'E6']} // slightly transparent
+                    colors={[theme.colors.primary + 'E6', theme.colors.primaryGradientEnd + 'E6']} // slightly transparent
                     style={styles.container}
                 >
                     <Animated.View style={[styles.content, { opacity, transform: [{ scale }] }]}>
@@ -118,6 +118,16 @@ export const MatchModal: React.FC<MatchModalProps> = ({
                             </Animated.View>
                         </View>
 
+                        {/* Coffee Date Chance Banner */}
+                        <View style={styles.coffeeChanceBanner}>
+                            <Text style={styles.coffeeEmoji}>☕</Text>
+                            <View style={styles.coffeeTextContainer}>
+                                <Text style={styles.coffeeTitle}>Win a Sponsored Coffee Date!</Text>
+                                <Text style={styles.coffeeSubtitle}>You've entered for a chance to get a free coffee date at a cafe nearby</Text>
+                                <Text style={styles.coffeeLuck}>🎲 See your luck after midnight</Text>
+                            </View>
+                        </View>
+
                         <View style={styles.actions}>
                             <TouchableOpacity style={styles.messageButton} onPress={onSendMessage}>
                                 <Ionicons name="chatbubble" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
@@ -125,7 +135,7 @@ export const MatchModal: React.FC<MatchModalProps> = ({
                             </TouchableOpacity>
 
                             <TouchableOpacity style={styles.keepSwipingButton} onPress={onKeepSwiping}>
-                                <Text style={styles.keepSwipingText}>Keep Swiping</Text>
+                                <Text style={styles.keepSwipingText}>Keep Discovering</Text>
                             </TouchableOpacity>
                         </View>
                     </Animated.View>
@@ -232,5 +242,41 @@ const getStyles = (theme: any) => StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    // Coffee Date Chance Banner
+    coffeeChanceBanner: {
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 32,
+        marginHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    coffeeEmoji: {
+        fontSize: 32,
+    },
+    coffeeTextContainer: {
+        flex: 1,
+    },
+    coffeeTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    coffeeSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.8)',
+        lineHeight: 18,
+        marginBottom: 8,
+    },
+    coffeeLuck: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFD700',
     },
 });

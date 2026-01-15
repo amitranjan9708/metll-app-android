@@ -36,6 +36,11 @@ export const SettingsScreen: React.FC = () => {
 
   const settingsItems = [
     {
+      icon: 'calendar-outline',
+      title: 'Dates',
+      onPress: () => navigation.navigate('Dates'),
+    },
+    {
       icon: 'person-outline',
       title: 'Edit Profile',
       onPress: () => navigation.navigate('EditProfile'),
@@ -51,7 +56,11 @@ export const SettingsScreen: React.FC = () => {
       onPress: () => navigation.navigate('Referral'),
     },
     { icon: 'notifications-outline', title: 'Notifications' },
-    { icon: 'lock-closed-outline', title: 'Privacy & Security' },
+    {
+      icon: 'lock-closed-outline',
+      title: 'Privacy & Security',
+      onPress: () => navigation.navigate('PrivacySecurity'),
+    },
     { icon: 'help-circle-outline', title: 'Help & Support' },
     { icon: 'document-text-outline', title: 'Terms & Privacy' },
   ];

@@ -10,4 +10,6 @@ export { SituationSelectionScreen } from './SituationSelectionScreen';
 export { SituationAnswerScreen } from './SituationAnswerScreen';
 export { PhotoUploadScreen } from './PhotoUploadScreen';
 export { DateScreen } from './DateScreen';
+export { DatesScreen } from './DatesScreen';
 export { CallScreen } from './CallScreen';
+export { PrivacySecurityScreen } from './PrivacySecurityScreen';

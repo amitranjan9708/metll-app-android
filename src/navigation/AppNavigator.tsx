@@ -28,6 +28,8 @@ import { ChatScreen } from '../screens/ChatScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { CallScreen } from '../screens/CallScreen';
 import { ReferralScreen } from '../screens/ReferralScreen';
+import { PrivacySecurityScreen } from '../screens/PrivacySecurityScreen';
+import { DatesScreen } from '../screens/DatesScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -101,6 +103,7 @@ const MainTabs = () => {
         component={DateScreen}
         options={{
           title: 'Date',
+          headerShown: false,
           tabBarIcon: ({ focused }) => <TabBarIcon name="rose" focused={focused} />,
         }}
       />
@@ -269,6 +272,7 @@ export const AppNavigator = () => {
               options={{
                 headerShown: false,
                 gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
               }}
             />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -278,6 +282,24 @@ export const AppNavigator = () => {
             <Stack.Screen name="SituationAnswer" component={SituationAnswerScreen} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
             <Stack.Screen name="Referral" component={ReferralScreen} />
+            <Stack.Screen
+              name="Dates"
+              component={DatesScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
+            <Stack.Screen
+              name="PrivacySecurity"
+              component={PrivacySecurityScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
           </>
         )}
       </Stack.Navigator>

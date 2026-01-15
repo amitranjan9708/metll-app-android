@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Profile, MatchData, SwipeResponse, Message, MatchedUser, ChatHostSession, ChatHostMessage } from '../types';
+import { cache } from './cache';
 
 // Configure API base URL
 const LOCAL_IP = '192.168.1.9'; // Computer's LAN IP
@@ -54,6 +55,10 @@ const MOCK_PROFILES: Profile[] = [
         profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
         distance: '3.2 km',
         isVerified: true,
+        situationResponses: [
+            { questionId: 1, answer: "When the dog owner apologized and offered to replace my coffee, we ended up chatting for an hour and became great friends!", answeredAt: new Date().toISOString() },
+            { questionId: 2, answer: "Tell them their presentation was great but offer a tip for next time in private", answeredAt: new Date().toISOString() },
+        ],
     },
     {
         id: 2,
@@ -64,6 +69,9 @@ const MOCK_PROFILES: Profile[] = [
         profilePhoto: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400',
         distance: '5.8 km',
         isVerified: false,
+        situationResponses: [
+            { questionId: 3, answer: "I'd introduce myself and maybe try a new dance move to impress them!", answeredAt: new Date().toISOString() },
+        ],
     },
     {
         id: 3,
@@ -74,6 +82,10 @@ const MOCK_PROFILES: Profile[] = [
         profilePhoto: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400',
         distance: '2.1 km',
         isVerified: true,
+        situationResponses: [
+            { questionId: 4, answer: "When life gives you lemons, I make lemon water and start my workout!", answeredAt: new Date().toISOString() },
+            { questionId: 5, answer: "Sleep in, make pancakes, then hit the gym for a fun workout with friends", answeredAt: new Date().toISOString() },
+        ],
     },
 ];
 
@@ -525,6 +537,9 @@ export const authApi = {
         try {
             await AsyncStorage.removeItem('authToken');
             console.log('Auth token removed');
+            // Clear all cache on logout
+            await cache.clearAll();
+            console.log('Cache cleared on logout');
         } catch (error) {
             console.error('Error removing auth token:', error);
         }
@@ -800,6 +815,13 @@ export const authApi = {
      * GET /api/user/profile
      */
     getUserProfile: async (): Promise<{ success: boolean; message?: string; data?: { user: any } }> => {
+        // Check cache first
+        const cached = await cache.getUserProfile();
+        if (cached) {
+            console.log('📦 Using cached user profile');
+            return { success: true, data: { user: cached } };
+        }
+
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 300));
             const mockResponse = {
@@ -822,6 +844,9 @@ export const authApi = {
                 },
             };
             logMock('authApi.getUserProfile()', mockResponse);
+            if (mockResponse.data?.user) {
+                await cache.setUserProfile(mockResponse.data.user);
+            }
             return mockResponse;
         }
 
@@ -836,6 +861,11 @@ export const authApi = {
             const data = await response.json();
             const duration = Date.now() - startTime;
             logResponse('GET', '/user/profile', response.status, data, duration);
+
+            // Cache the user profile
+            if (data.success && data.data?.user) {
+                await cache.setUserProfile(data.data.user);
+            }
 
             return data;
         } catch (error) {
@@ -886,11 +916,48 @@ export const authApi = {
             const duration = Date.now() - startTime;
             logResponse('PUT', '/user/profile', response.status, data, duration);
 
+            // Invalidate user profile cache after update
+            if (data.success) {
+                await cache.remove('cache:user_profile');
+                // Also invalidate matches cache as profile changes might affect matches
+                await cache.invalidateMatches();
+            }
+
             return data;
         } catch (error) {
             logError('PUT', '/user/profile', error);
             // Don't throw - profile updates should fail silently and retry later
             return { success: false, message: 'Failed to sync profile' };
+        }
+    },
+
+    /**
+     * Delete user account permanently
+     * DELETE /api/user/account
+     */
+    deleteAccount: async (): Promise<{ success: boolean; message?: string }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            logMock('authApi.deleteAccount()', { success: true });
+            return { success: true, message: 'Account deleted' };
+        }
+
+        try {
+            logRequest('DELETE', '/user/account', undefined);
+            const startTime = Date.now();
+
+            const response = await authFetch('/user/account', {
+                method: 'DELETE',
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('DELETE', '/user/account', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('DELETE', '/user/account', error);
+            return { success: false, message: 'Failed to delete account' };
         }
     },
 };
@@ -904,9 +971,26 @@ export const swipeApi = {
      * Get profiles available to swipe on
      */
     getProfiles: async (): Promise<Profile[]> => {
+        // Check cache first
+        const cached = await cache.getProfiles();
+        if (cached && cached.length > 0) {
+            console.log('📦 Using cached profiles');
+            // Still fetch in background to update cache
+            authFetch('/swipe/profiles')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        cache.setProfiles(data.data);
+                    }
+                })
+                .catch(err => console.error('Background profile fetch error:', err));
+            return cached;
+        }
+
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 500));
             logMock('swipeApi.getProfiles()', MOCK_PROFILES);
+            await cache.setProfiles(MOCK_PROFILES);
             return MOCK_PROFILES;
         }
 
@@ -917,6 +1001,9 @@ export const swipeApi = {
             if (!data.success) {
                 throw new Error(data.message || 'Failed to get profiles');
             }
+
+            // Cache the profiles
+            await cache.setProfiles(data.data);
 
             return data.data;
         } catch (error) {
@@ -955,6 +1042,12 @@ export const swipeApi = {
                 },
             };
             logMock(`swipeApi.swipe(${targetUserId}, ${direction})`, result);
+            // Invalidate profiles cache after swipe
+            await cache.invalidateProfiles();
+            if (isMatch) {
+                // Invalidate matches cache if there's a match
+                await cache.invalidateMatches();
+            }
             return result;
         }
 
@@ -965,6 +1058,14 @@ export const swipeApi = {
             });
 
             const data = await response.json();
+            
+            // Invalidate profiles cache after swipe
+            await cache.invalidateProfiles();
+            if (data.data?.isMatch) {
+                // Invalidate matches cache if there's a match
+                await cache.invalidateMatches();
+            }
+            
             return data;
         } catch (error) {
             console.error('Swipe error:', error);
@@ -976,9 +1077,26 @@ export const swipeApi = {
      * Get all matches
      */
     getMatches: async (): Promise<MatchData[]> => {
+        // Check cache first
+        const cached = await cache.getMatches();
+        if (cached) {
+            console.log('📦 Using cached matches');
+            // Still fetch in background to update cache
+            authFetch('/swipe/matches')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        cache.setMatches(data.data);
+                    }
+                })
+                .catch(err => console.error('Background matches fetch error:', err));
+            return cached;
+        }
+
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 500));
             logMock('swipeApi.getMatches()', MOCK_MATCHES);
+            await cache.setMatches(MOCK_MATCHES);
             return MOCK_MATCHES;
         }
 
@@ -989,6 +1107,9 @@ export const swipeApi = {
             if (!data.success) {
                 throw new Error(data.message || 'Failed to get matches');
             }
+
+            // Cache the matches
+            await cache.setMatches(data.data);
 
             return data.data;
         } catch (error) {
@@ -1030,6 +1151,8 @@ export const swipeApi = {
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 300));
             logMock(`swipeApi.unmatch(${matchId})`, { success: true });
+            // Invalidate matches cache after unmatch
+            await cache.invalidateMatches();
             return;
         }
 
@@ -1041,6 +1164,10 @@ export const swipeApi = {
             if (!data.success) {
                 throw new Error(data.message || 'Failed to unmatch');
             }
+            // Invalidate matches cache after unmatch
+            await cache.invalidateMatches();
+            // Also invalidate chat room cache
+            await cache.invalidateChatRoom(matchId);
         } catch (error) {
             console.error('Unmatch error:', error);
             throw error;
@@ -1054,6 +1181,8 @@ export const swipeApi = {
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 300));
             logMock('swipeApi.resetSwipes()', { success: true, deletedCount: 5 });
+            // Invalidate profiles cache after reset
+            await cache.invalidateProfiles();
             return { success: true, data: { deletedCount: 5 } };
         }
 
@@ -1065,9 +1194,61 @@ export const swipeApi = {
             if (!data.success) {
                 throw new Error(data.message || 'Failed to reset swipes');
             }
+            // Invalidate profiles cache after reset
+            await cache.invalidateProfiles();
             return data;
         } catch (error) {
             console.error('Reset swipes error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get users who have liked the current user (pending likes)
+     */
+    getWhoLikedMe: async (): Promise<Profile[]> => {
+        // Check cache first
+        const cached = await cache.getWhoLikedMe();
+        if (cached) {
+            console.log('📦 Using cached who liked me');
+            // Still fetch in background to update cache
+            authFetch('/swipe/likes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        cache.setWhoLikedMe(data.data);
+                    }
+                })
+                .catch(err => console.error('Background who liked me fetch error:', err));
+            return cached;
+        }
+
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            // Return subset of mock profiles as "who liked me"
+            const mockLikes = MOCK_PROFILES.slice(0, 2).map(p => ({
+                ...p,
+                likedAt: new Date().toISOString(),
+            }));
+            logMock('swipeApi.getWhoLikedMe()', mockLikes);
+            await cache.setWhoLikedMe(mockLikes);
+            return mockLikes;
+        }
+
+        try {
+            const response = await authFetch('/swipe/likes');
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to get likes');
+            }
+
+            // Cache the likes
+            await cache.setWhoLikedMe(data.data);
+
+            return data.data;
+        } catch (error) {
+            console.error('Get who liked me error:', error);
             throw error;
         }
     },
@@ -1091,6 +1272,22 @@ export const chatApi = {
      * Get chat room with messages
      */
     getChatRoom: async (matchId: number): Promise<ChatRoomData> => {
+        // Check cache first (shorter expiry for chat)
+        const cached = await cache.getChatRoom(matchId);
+        if (cached) {
+            console.log('📦 Using cached chat room');
+            // Still fetch in background to update cache
+            authFetch(`/chat/${matchId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        cache.setChatRoom(matchId, data.data);
+                    }
+                })
+                .catch(err => console.error('Background chat fetch error:', err));
+            return cached;
+        }
+
         if (USE_MOCK_DATA) {
             await new Promise(resolve => setTimeout(resolve, 300));
             const match = MOCK_MATCHES.find(m => m.id === matchId);
@@ -1103,6 +1300,7 @@ export const chatApi = {
                 },
             };
             logMock(`chatApi.getChatRoom(${matchId})`, result);
+            await cache.setChatRoom(matchId, result);
             return result;
         }
 
@@ -1113,6 +1311,9 @@ export const chatApi = {
             if (!data.success) {
                 throw new Error(data.message || 'Failed to get chat room');
             }
+
+            // Cache the chat room
+            await cache.setChatRoom(matchId, data.data);
 
             return data.data;
         } catch (error) {
@@ -1138,6 +1339,8 @@ export const chatApi = {
                 isOwn: true,
             };
             logMock(`chatApi.sendMessage(${matchId}, "${content}")`, result);
+            // Invalidate chat room cache after sending message
+            await cache.invalidateChatRoom(matchId);
             return result;
         }
 
@@ -1152,6 +1355,9 @@ export const chatApi = {
             if (!data.success) {
                 throw new Error(data.message || 'Failed to send message');
             }
+
+            // Invalidate chat room cache after sending message
+            await cache.invalidateChatRoom(matchId);
 
             return data.data;
         } catch (error) {

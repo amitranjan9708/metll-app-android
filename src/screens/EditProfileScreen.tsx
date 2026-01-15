@@ -1,455 +1,522 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Image,
+  ScrollView,
   TouchableOpacity,
+  TextInput,
+  Image,
   Alert,
   ActivityIndicator,
-  Dimensions,
   RefreshControl,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { theme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PROFILE_CACHE_KEY = '@user_profile_cache';
-const { width } = Dimensions.get('window');
 
 export const EditProfileScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
 
-  // Reload data when screen comes into focus
+  // Form states
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [schoolName, setSchoolName] = useState('');
+  const [schoolCity, setSchoolCity] = useState('');
+  const [schoolClass, setSchoolClass] = useState('');
+  const [collegeName, setCollegeName] = useState('');
+  const [collegeDept, setCollegeDept] = useState('');
+  const [collegeLocation, setCollegeLocation] = useState('');
+  const [officeName, setOfficeName] = useState('');
+  const [officeDesignation, setOfficeDesignation] = useState('');
+  const [officeDept, setOfficeDept] = useState('');
+  const [currentCity, setCurrentCity] = useState('');
+  const [pastCity, setPastCity] = useState('');
+
   useFocusEffect(
     useCallback(() => {
-      loadProfileData();
+      loadProfile();
     }, [])
   );
 
-  const loadProfileData = async () => {
+  const loadProfile = async () => {
     try {
       if (!refreshing) setLoading(true);
-      const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-      if (cachedData) {
-        setProfileData(JSON.parse(cachedData));
-        setLoading(false);
+
+      // Try cache first
+      const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        setProfileData(data);
+        populateForm(data);
       }
+
+      // Fetch fresh data
       const response = await authApi.getUserProfile();
       if (response.success && response.data?.user) {
-        const freshData = response.data.user;
-        setProfileData(freshData);
-        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(freshData));
-      } else if (!cachedData) {
-        setProfileData(user);
+        const data = response.data.user;
+        setProfileData(data);
+        populateForm(data);
+        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
       }
     } catch (error) {
-      console.error('Failed to load profile:', error);
-      const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-      if (cachedData) {
-        setProfileData(JSON.parse(cachedData));
-      } else {
-        setProfileData(user);
-      }
+      console.error('Load profile error:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadProfileData();
+  const populateForm = (data: any) => {
+    setName(data.name || '');
+    setBio(data.bio || '');
+    setAge(data.age?.toString() || '');
+    setGender(data.gender || '');
+    setSchoolName(data.school?.name || '');
+    setSchoolCity(data.school?.city || '');
+    setSchoolClass(data.school?.class || '');
+    setCollegeName(data.college?.name || '');
+    setCollegeDept(data.college?.department || '');
+    setCollegeLocation(data.college?.location || '');
+    setOfficeName(data.office?.name || '');
+    setOfficeDesignation(data.office?.designation || '');
+    setOfficeDept(data.office?.department || '');
+    setCurrentCity(data.homeLocation?.current?.city || '');
+    setPastCity(data.homeLocation?.past?.city || '');
   };
+
+  const saveSection = async (section: string) => {
+    setSaving(true);
+    try {
+      let updateData: any = {};
+
+      if (section === 'basic') {
+        updateData = { name, bio, age: age ? parseInt(age) : undefined, gender };
+      } else if (section === 'school') {
+        updateData = { school: { name: schoolName, city: schoolCity, class: schoolClass } };
+      } else if (section === 'college') {
+        updateData = { college: { name: collegeName, department: collegeDept, location: collegeLocation } };
+      } else if (section === 'office') {
+        updateData = { office: { name: officeName, designation: officeDesignation, department: officeDept } };
+      } else if (section === 'address') {
+        updateData = { homeLocation: { current: { city: currentCity }, past: { city: pastCity } } };
+      }
+
+      const response = await authApi.updateProfile(updateData);
+      if (response.success) {
+        await loadProfile();
+        setEditingSection(null);
+        Alert.alert('Success', 'Profile updated!');
+      } else {
+        Alert.alert('Error', response.message || 'Update failed');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Update failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleEdit = (section: string) => {
+    if (editingSection === section) {
+      populateForm(profileData);
+      setEditingSection(null);
+    } else {
+      setEditingSection(section);
+    }
+  };
+
+  // Calculate profile completion percentage
+  const calculateCompletion = () => {
+    if (!profileData) return 0;
+    const fields = [
+      profileData.name,
+      profileData.bio,
+      profileData.age,
+      profileData.gender,
+      profileData.photo,
+      profileData.school?.name,
+      profileData.college?.name,
+      profileData.office?.name,
+      profileData.homeLocation?.current?.city,
+    ];
+    const filledFields = fields.filter(f => f && f !== '').length;
+    return Math.round((filledFields / fields.length) * 100);
+  };
+
+  const completionPercentage = calculateCompletion();
 
   if (loading && !profileData) {
     return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#E07A5F" />
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
   }
 
-  if (!profileData) {
-    return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <Ionicons name="alert-circle-outline" size={48} color="#6B6B6B" />
-        <Text style={styles.errorText}>No profile data available</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={loadProfileData}>
-          <Text style={styles.retryBtnText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const school = profileData.school;
-  const college = profileData.college;
-  const office = profileData.office;
-  const homeLocation = profileData.homeLocation;
-
   const photos: string[] = [];
-  if (profileData.photo) photos.push(profileData.photo);
-  if (Array.isArray(profileData.additionalPhotos)) {
-    photos.push(...profileData.additionalPhotos);
-  }
-
-  // Build sections data for FlatList
-  const sections = [
-    { key: 'header', type: 'header' },
-    { key: 'basicInfo', type: 'basicInfo' },
-    ...(photos.length > 0 ? [{ key: 'photos', type: 'photos' }] : []),
-    { key: 'school', type: 'school' },
-    { key: 'college', type: 'college' },
-    { key: 'office', type: 'office' },
-    { key: 'address', type: 'address' },
-    { key: 'account', type: 'account' },
-    { key: 'footer', type: 'footer' },
-  ];
-
-  const renderItem = ({ item }: { item: { key: string; type: string } }) => {
-    switch (item.type) {
-      case 'header':
-        return (
-          <View style={styles.profileHeader}>
-            <TouchableOpacity
-              style={styles.avatarContainer}
-              onPress={() => navigation.navigate('PhotoUpload')}
-            >
-              {profileData.photo ? (
-                <Image source={{ uri: profileData.photo }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="person" size={40} color="#9B9B9B" />
-                </View>
-              )}
-              <View style={styles.cameraBtn}>
-                <Ionicons name="camera" size={14} color="#FFF" />
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.userName}>{profileData.name || 'Your Name'}</Text>
-            {profileData.bio && <Text style={styles.userBio}>{profileData.bio}</Text>}
-          </View>
-        );
-
-      case 'basicInfo':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="person-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>Basic Info</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editChip}
-                onPress={() => navigation.navigate('EditBasicInfo')}
-              >
-                <Ionicons name="pencil" size={12} color="#E07A5F" />
-                <Text style={styles.editChipText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            {profileData.email && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>{profileData.email}</Text>
-              </View>
-            )}
-            {(profileData.phoneNumber || profileData.phone) && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Phone</Text>
-                <Text style={styles.infoValue}>{profileData.phoneNumber || profileData.phone}</Text>
-              </View>
-            )}
-            {profileData.age && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Age</Text>
-                <Text style={styles.infoValue}>{profileData.age}</Text>
-              </View>
-            )}
-            {profileData.gender && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Gender</Text>
-                <Text style={styles.infoValue}>{profileData.gender}</Text>
-              </View>
-            )}
-          </View>
-        );
-
-      case 'photos':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="images-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>Photos ({photos.length})</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editChip}
-                onPress={() => navigation.navigate('PhotoUpload')}
-              >
-                <Ionicons name="pencil" size={12} color="#E07A5F" />
-                <Text style={styles.editChipText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              horizontal
-              data={photos}
-              keyExtractor={(uri, idx) => `photo-${idx}`}
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item: uri, index }) => (
-                <View style={styles.photoThumbWrapper}>
-                  <Image source={{ uri }} style={styles.photoThumb} />
-                  {index === 0 && (
-                    <View style={styles.mainLabel}>
-                      <Text style={styles.mainLabelText}>Main</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            />
-          </View>
-        );
-
-      case 'school':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="book-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>School</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editChip}
-                onPress={() => navigation.navigate('Onboarding', { step: 'school', fromEdit: true })}
-              >
-                <Ionicons name="pencil" size={12} color="#E07A5F" />
-                <Text style={styles.editChipText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            {school?.name || school?.city ? (
-              <>
-                {school?.name && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Name</Text>
-                    <Text style={styles.infoValue}>{school.name}</Text>
-                  </View>
-                )}
-                {school?.city && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>City</Text>
-                    <Text style={styles.infoValue}>{school.city}</Text>
-                  </View>
-                )}
-                {school?.class && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Class</Text>
-                    <Text style={styles.infoValue}>{school.class}</Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.emptyText}>No school information added</Text>
-            )}
-          </View>
-        );
-
-      case 'college':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="school-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>College</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editChip}
-                onPress={() => navigation.navigate('EditCollege')}
-              >
-                <Ionicons name="pencil" size={12} color="#E07A5F" />
-                <Text style={styles.editChipText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            {college?.name || college?.department ? (
-              <>
-                {college?.name && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Name</Text>
-                    <Text style={styles.infoValue}>{college.name}</Text>
-                  </View>
-                )}
-                {college?.department && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Department</Text>
-                    <Text style={styles.infoValue}>{college.department}</Text>
-                  </View>
-                )}
-                {college?.location && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Location</Text>
-                    <Text style={styles.infoValue}>{college.location}</Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.emptyText}>No college information added</Text>
-            )}
-          </View>
-        );
-
-      case 'office':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="briefcase-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>Office</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editChip}
-                onPress={() => navigation.navigate('EditOffice')}
-              >
-                <Ionicons name="pencil" size={12} color="#E07A5F" />
-                <Text style={styles.editChipText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            {office?.name || office?.designation ? (
-              <>
-                {office?.name && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Company</Text>
-                    <Text style={styles.infoValue}>{office.name}</Text>
-                  </View>
-                )}
-                {office?.designation && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Designation</Text>
-                    <Text style={styles.infoValue}>{office.designation}</Text>
-                  </View>
-                )}
-                {office?.department && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Department</Text>
-                    <Text style={styles.infoValue}>{office.department}</Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.emptyText}>No office information added</Text>
-            )}
-          </View>
-        );
-
-      case 'address':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="home-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>Address</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editChip}
-                onPress={() => navigation.navigate('EditAddress')}
-              >
-                <Ionicons name="pencil" size={12} color="#E07A5F" />
-                <Text style={styles.editChipText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            {homeLocation?.current?.city || homeLocation?.past?.city ? (
-              <>
-                {homeLocation?.current?.city && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Current City</Text>
-                    <Text style={styles.infoValue}>{homeLocation.current.city}</Text>
-                  </View>
-                )}
-                {homeLocation?.past?.city && (
-                  <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Previous City</Text>
-                    <Text style={styles.infoValue}>{homeLocation.past.city}</Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.emptyText}>No address information added</Text>
-            )}
-          </View>
-        );
-
-      case 'account':
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardTitleRow}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
-                <Text style={styles.cardTitle}>Account</Text>
-              </View>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Verified</Text>
-              <Text style={styles.infoValue}>{profileData.isVerified ? 'Yes' : 'No'}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Onboarded</Text>
-              <Text style={styles.infoValue}>{profileData.isOnboarded ? 'Yes' : 'No'}</Text>
-            </View>
-            {profileData.createdAt && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Member Since</Text>
-                <Text style={styles.infoValue}>{new Date(profileData.createdAt).toLocaleDateString()}</Text>
-              </View>
-            )}
-          </View>
-        );
-
-      case 'footer':
-        return <View style={{ height: insets.bottom + 40 }} />;
-
-      default:
-        return null;
-    }
-  };
+  if (profileData?.photo) photos.push(profileData.photo);
+  if (Array.isArray(profileData?.additionalPhotos)) photos.push(...profileData.additionalPhotos);
 
   return (
     <View style={styles.container}>
       {/* Fixed Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity onPress={loadProfileData} style={styles.headerBtn}>
-          <Ionicons name="refresh" size={22} color="#6B6B6B" />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* FlatList for reliable scrolling */}
-      <FlatList
-        data={sections}
-        keyExtractor={(item) => item.key}
-        renderItem={renderItem}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={true}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#E07A5F']}
-            tintColor="#E07A5F"
+            onRefresh={() => { setRefreshing(true); loadProfile(); }}
+            tintColor={theme.colors.primary}
           />
         }
-      />
+      >
+        {/* Avatar Section with Completion */}
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarWrapper}>
+            <TouchableOpacity onPress={() => navigation.navigate('PhotoUpload')}>
+              {profileData?.photo ? (
+                <Image source={{ uri: profileData.photo }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={48} color={theme.colors.textMuted} />
+                </View>
+              )}
+              <View style={styles.cameraIcon}>
+                <Ionicons name="camera" size={16} color="#fff" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Completion Circle */}
+            <View style={styles.completionCircle}>
+              <View style={[styles.completionInner, { borderColor: completionPercentage >= 80 ? '#10B981' : completionPercentage >= 50 ? '#F59E0B' : '#EF4444' }]}>
+                <Text style={styles.completionText}>{completionPercentage}%</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={styles.avatarName}>{profileData?.name || 'Your Name'}</Text>
+          <Text style={styles.completionLabel}>
+            {completionPercentage >= 80 ? '✨ Profile looking great!' : completionPercentage >= 50 ? '🔧 Almost there!' : '📝 Complete your profile'}
+          </Text>
+        </View>
+
+        {/* Photos Card */}
+        {photos.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardTitleRow}>
+                <Ionicons name="images" size={20} color={theme.colors.primary} />
+                <Text style={styles.cardTitle}>Photos ({photos.length})</Text>
+              </View>
+              <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('PhotoUpload')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {photos.map((uri, i) => (
+                <Image key={i} source={{ uri }} style={styles.photoThumb} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Basic Info Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="person-circle" size={20} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>Basic Info</Text>
+            </View>
+            {editingSection === 'basic' ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={() => saveSection('basic')} disabled={saving}>
+                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.editBtn} onPress={() => toggleEdit('basic')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Name</Text>
+            {editingSection === 'basic' ? (
+              <TextInput style={styles.fieldInput} value={name} onChangeText={setName} placeholder="Your name" />
+            ) : (
+              <Text style={styles.fieldValue}>{name || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Bio</Text>
+            {editingSection === 'basic' ? (
+              <TextInput style={styles.fieldInput} value={bio} onChangeText={setBio} placeholder="About you" multiline />
+            ) : (
+              <Text style={styles.fieldValue}>{bio || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Age</Text>
+            {editingSection === 'basic' ? (
+              <TextInput style={styles.fieldInput} value={age} onChangeText={setAge} placeholder="Age" keyboardType="numeric" />
+            ) : (
+              <Text style={styles.fieldValue}>{age || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Gender</Text>
+            {editingSection === 'basic' ? (
+              <TextInput style={styles.fieldInput} value={gender} onChangeText={setGender} placeholder="Gender" />
+            ) : (
+              <Text style={styles.fieldValue}>{gender || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <Text style={styles.fieldValue}>{profileData?.email || 'Not set'}</Text>
+          </View>
+
+          <View style={[styles.fieldRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.fieldLabel}>Phone</Text>
+            <Text style={styles.fieldValue}>{profileData?.phoneNumber || profileData?.phone || 'Not set'}</Text>
+          </View>
+        </View>
+
+        {/* School Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="book" size={20} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>School</Text>
+            </View>
+            {editingSection === 'school' ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={() => saveSection('school')} disabled={saving}>
+                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.editBtn} onPress={() => toggleEdit('school')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>School Name</Text>
+            {editingSection === 'school' ? (
+              <TextInput style={styles.fieldInput} value={schoolName} onChangeText={setSchoolName} placeholder="School name" />
+            ) : (
+              <Text style={styles.fieldValue}>{schoolName || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>City</Text>
+            {editingSection === 'school' ? (
+              <TextInput style={styles.fieldInput} value={schoolCity} onChangeText={setSchoolCity} placeholder="City" />
+            ) : (
+              <Text style={styles.fieldValue}>{schoolCity || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={[styles.fieldRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.fieldLabel}>Class</Text>
+            {editingSection === 'school' ? (
+              <TextInput style={styles.fieldInput} value={schoolClass} onChangeText={setSchoolClass} placeholder="Class" />
+            ) : (
+              <Text style={styles.fieldValue}>{schoolClass || 'Not set'}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* College Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="school" size={20} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>College</Text>
+            </View>
+            {editingSection === 'college' ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={() => saveSection('college')} disabled={saving}>
+                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.editBtn} onPress={() => toggleEdit('college')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>College Name</Text>
+            {editingSection === 'college' ? (
+              <TextInput style={styles.fieldInput} value={collegeName} onChangeText={setCollegeName} placeholder="College name" />
+            ) : (
+              <Text style={styles.fieldValue}>{collegeName || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Department</Text>
+            {editingSection === 'college' ? (
+              <TextInput style={styles.fieldInput} value={collegeDept} onChangeText={setCollegeDept} placeholder="Department" />
+            ) : (
+              <Text style={styles.fieldValue}>{collegeDept || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={[styles.fieldRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.fieldLabel}>Location</Text>
+            {editingSection === 'college' ? (
+              <TextInput style={styles.fieldInput} value={collegeLocation} onChangeText={setCollegeLocation} placeholder="Location" />
+            ) : (
+              <Text style={styles.fieldValue}>{collegeLocation || 'Not set'}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Office Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="briefcase" size={20} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>Office</Text>
+            </View>
+            {editingSection === 'office' ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={() => saveSection('office')} disabled={saving}>
+                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.editBtn} onPress={() => toggleEdit('office')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Company</Text>
+            {editingSection === 'office' ? (
+              <TextInput style={styles.fieldInput} value={officeName} onChangeText={setOfficeName} placeholder="Company name" />
+            ) : (
+              <Text style={styles.fieldValue}>{officeName || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Designation</Text>
+            {editingSection === 'office' ? (
+              <TextInput style={styles.fieldInput} value={officeDesignation} onChangeText={setOfficeDesignation} placeholder="Job title" />
+            ) : (
+              <Text style={styles.fieldValue}>{officeDesignation || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={[styles.fieldRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.fieldLabel}>Department</Text>
+            {editingSection === 'office' ? (
+              <TextInput style={styles.fieldInput} value={officeDept} onChangeText={setOfficeDept} placeholder="Department" />
+            ) : (
+              <Text style={styles.fieldValue}>{officeDept || 'Not set'}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Address Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="home" size={20} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>Address</Text>
+            </View>
+            {editingSection === 'address' ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={() => saveSection('address')} disabled={saving}>
+                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.editBtn} onPress={() => toggleEdit('address')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Current City</Text>
+            {editingSection === 'address' ? (
+              <TextInput style={styles.fieldInput} value={currentCity} onChangeText={setCurrentCity} placeholder="Current city" />
+            ) : (
+              <Text style={styles.fieldValue}>{currentCity || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={[styles.fieldRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.fieldLabel}>Previous City</Text>
+            {editingSection === 'address' ? (
+              <TextInput style={styles.fieldInput} value={pastCity} onChangeText={setPastCity} placeholder="Previous city" />
+            ) : (
+              <Text style={styles.fieldValue}>{pastCity || 'Not set'}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Account Info Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="shield-checkmark" size={20} color={theme.colors.primary} />
+              <Text style={styles.cardTitle}>Account</Text>
+            </View>
+          </View>
+
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>Status</Text>
+            <View style={styles.statusBadge}>
+              <Ionicons name={profileData?.isVerified ? 'checkmark-circle' : 'alert-circle'} size={16} color={profileData?.isVerified ? '#10B981' : '#F59E0B'} />
+              <Text style={[styles.statusText, { color: profileData?.isVerified ? '#10B981' : '#F59E0B' }]}>
+                {profileData?.isVerified ? 'Verified' : 'Not Verified'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.fieldRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.fieldLabel}>Member Since</Text>
+            <Text style={styles.fieldValue}>
+              {profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString() : 'Unknown'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Bottom spacing */}
+        <View style={{ height: insets.bottom + 40 }} />
+      </ScrollView>
     </View>
   );
 };
@@ -459,122 +526,129 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
-  loadingContainer: {
+  scrollView: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
+  },
+  centered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6B6B6B',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B6B6B',
-  },
-  retryBtn: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#E07A5F',
-    borderRadius: 24,
-  },
-  retryBtnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '600',
+    color: theme.colors.textSecondary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#FAFAFA',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
+    borderBottomColor: '#F0F0F0',
   },
-  headerBtn: {
+  backBtn: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1A1A1A',
   },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  profileHeader: {
+  avatarSection: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginVertical: theme.spacing.xl,
   },
-  avatarContainer: {
+  avatarWrapper: {
     position: 'relative',
-    marginBottom: 12,
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#E5E5E5',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: theme.colors.border,
   },
   avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E07A5F',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: theme.colors.backgroundCard,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FAFAFA',
+    borderColor: theme.colors.border,
   },
-  userName: {
-    fontSize: 22,
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  completionCircle: {
+    position: 'absolute',
+    bottom: -5,
+    right: -10,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 3,
+    ...theme.shadows.sm,
+  },
+  completionInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  completionText: {
+    fontSize: 11,
     fontWeight: '700',
     color: '#1A1A1A',
   },
-  userBio: {
-    fontSize: 14,
-    color: '#6B6B6B',
-    marginTop: 4,
-    textAlign: 'center',
-    paddingHorizontal: 20,
+  avatarName: {
+    marginTop: 12,
+    fontSize: 22,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  completionLabel: {
+    marginTop: 8,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: theme.spacing.md,
   },
   cardTitleRow: {
     flexDirection: 'row',
@@ -584,63 +658,72 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: theme.colors.textPrimary,
   },
-  editChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: 'rgba(224, 122, 95, 0.1)',
-    borderRadius: 12,
+  editBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: theme.colors.primary + '15',
+    borderRadius: 20,
   },
-  editChipText: {
-    fontSize: 12,
+  editBtnText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#E07A5F',
+    color: theme.colors.primary,
   },
-  infoItem: {
-    paddingVertical: 8,
+  saveBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 20,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  fieldRow: {
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.04)',
+    borderBottomColor: theme.colors.border + '50',
   },
-  infoLabel: {
+  fieldLabel: {
     fontSize: 12,
-    color: '#9B9B9B',
-    marginBottom: 2,
+    fontWeight: '500',
+    color: theme.colors.textSecondary,
+    marginBottom: 4,
+    textTransform: 'uppercase',
   },
-  infoValue: {
+  fieldValue: {
     fontSize: 15,
-    color: '#1A1A1A',
+    color: theme.colors.textPrimary,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#9B9B9B',
-    fontStyle: 'italic',
-  },
-  photoThumbWrapper: {
-    marginRight: 10,
-    position: 'relative',
+  fieldInput: {
+    fontSize: 15,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.backgroundCard,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '40',
   },
   photoThumb: {
-    width: 72,
-    height: 72,
+    width: 70,
+    height: 70,
     borderRadius: 10,
-    backgroundColor: '#E5E5E5',
+    marginRight: 10,
+    backgroundColor: theme.colors.border,
   },
-  mainLabel: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  mainLabelText: {
-    fontSize: 9,
+  statusText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FFF',
   },
 });
