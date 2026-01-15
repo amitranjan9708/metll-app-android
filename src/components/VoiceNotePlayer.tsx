@@ -34,13 +34,30 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const progressAnim = useRef(new Animated.Value(0)).current;
 
+    // Safe parsing for waveform data
+    const getWaveformArray = (data: any): number[] => {
+        if (!data) return [];
+        if (Array.isArray(data)) return data;
+        if (typeof data === 'string') {
+            try {
+                const parsed = JSON.parse(data);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    };
+
+    const validatedWaveform = getWaveformArray(waveformData);
+
     // Generate waveform bars (use provided data or generate placeholder)
-    const waveform = waveformData && waveformData.length > 0
-        ? waveformData.slice(0, WAVEFORM_BARS)
+    const waveform = validatedWaveform.length > 0
+        ? validatedWaveform.slice(0, WAVEFORM_BARS)
         : Array.from({ length: WAVEFORM_BARS }, () => Math.random() * 0.6 + 0.2);
 
     // Normalize waveform to 0-1 range
-    const maxAmplitude = Math.max(...waveform);
+    const maxAmplitude = Math.max(...waveform, 0.1); // Avoid division by zero
     const normalizedWaveform = waveform.map(v => v / maxAmplitude);
 
     useEffect(() => {

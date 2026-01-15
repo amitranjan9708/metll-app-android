@@ -31,33 +31,31 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     const [isRecording, setIsRecording] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
-    const [slideOffset, setSlideOffset] = useState(0);
-    const [isCancelling, setIsCancelling] = useState(false);
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
-    const slideAnim = useRef(new Animated.Value(0)).current;
     const waveformData = useRef<number[]>([]);
     const durationInterval = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (isRecording) {
-            // Pulse animation
             const pulse = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, {
-                        toValue: 1.2,
-                        duration: 500,
+                        toValue: 1.1,
+                        duration: 600,
                         useNativeDriver: true,
                     }),
                     Animated.timing(pulseAnim, {
                         toValue: 1,
-                        duration: 500,
+                        duration: 600,
                         useNativeDriver: true,
                     }),
                 ])
             );
             pulse.start();
             return () => pulse.stop();
+        } else {
+            pulseAnim.setValue(1);
         }
     }, [isRecording]);
 
@@ -69,7 +67,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
     const startRecording = async () => {
         try {
-            await Audio.requestPermissionsAsync();
+            const permission = await Audio.requestPermissionsAsync();
+            if (permission.status !== 'granted') return;
+
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: true,
                 playsInSilentModeIOS: true,
@@ -85,10 +85,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             waveformData.current = [];
             Vibration.vibrate(50);
 
-            // Start duration counter
             durationInterval.current = setInterval(() => {
                 setRecordingDuration(prev => prev + 1);
-                // Simulate waveform data (in production, you'd get real audio levels)
                 waveformData.current.push(Math.random() * 0.6 + 0.2);
             }, 1000);
 
@@ -110,14 +108,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
             setIsRecording(false);
             setRecording(null);
-            setSlideOffset(0);
-            setIsCancelling(false);
 
             if (cancelled || !uri) {
                 onCancel();
             } else {
                 onRecordingComplete(uri, recordingDuration, waveformData.current);
             }
+            Vibration.vibrate(30);
         } catch (error) {
             console.error('Failed to stop recording:', error);
             setIsRecording(false);
@@ -126,35 +123,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         }
     };
 
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: () => {
-                startRecording();
-            },
-            onPanResponderMove: (_, gestureState) => {
-                const offset = Math.min(0, gestureState.dx);
-                setSlideOffset(offset);
-                slideAnim.setValue(offset);
-                setIsCancelling(offset < CANCEL_THRESHOLD);
-
-                if (offset < CANCEL_THRESHOLD && !isCancelling) {
-                    Vibration.vibrate(30);
-                }
-            },
-            onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dx < CANCEL_THRESHOLD) {
-                    stopRecording(true);
-                } else {
-                    stopRecording(false);
-                }
-            },
-            onPanResponderTerminate: () => {
-                stopRecording(true);
-            },
-        })
-    ).current;
+    const handleMicPress = () => {
+        if (isRecording) {
+            stopRecording(false);
+        } else {
+            startRecording();
+        }
+    };
 
     if (!isVisible) return null;
 
@@ -162,58 +137,45 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
     return (
         <View style={styles.container}>
-            {isRecording ? (
+            {isRecording && (
                 <View style={styles.recordingContainer}>
-                    <Animated.View
-                        style={[
-                            styles.slideContainer,
-                            { transform: [{ translateX: slideAnim }] }
-                        ]}
+                    <TouchableOpacity
+                        style={styles.cancelButton}
+                        onPress={() => stopRecording(true)}
                     >
-                        <View style={styles.slideHint}>
-                            <Ionicons
-                                name="chevron-back"
-                                size={20}
-                                color={isCancelling ? theme.colors.error : theme.colors.textSecondary}
-                            />
-                            <Text style={[
-                                styles.slideText,
-                                isCancelling && { color: theme.colors.error }
-                            ]}>
-                                {isCancelling ? 'Release to cancel' : 'Slide to cancel'}
-                            </Text>
-                        </View>
+                        <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                    </TouchableOpacity>
 
+                    <View style={styles.activeInfo}>
                         <Animated.View style={[
-                            styles.recordingIndicator,
-                            { transform: [{ scale: pulseAnim }] }
-                        ]}>
-                            <View style={styles.recordingDot} />
-                        </Animated.View>
-
+                            styles.recordingDot,
+                            { opacity: pulseAnim }
+                        ]} />
                         <Text style={styles.durationText}>{formatTime(recordingDuration)}</Text>
-                    </Animated.View>
+                    </View>
                 </View>
-            ) : null}
+            )}
 
-            <View
+            <TouchableOpacity
                 style={styles.micButtonContainer}
-                {...panResponder.panHandlers}
+                onPress={handleMicPress}
+                activeOpacity={0.8}
             >
                 <Animated.View style={[
                     styles.micButton,
                     isRecording && {
                         transform: [{ scale: pulseAnim }],
-                        backgroundColor: theme.colors.error,
+                        backgroundColor: theme.colors.primary,
                     }
                 ]}>
                     <Ionicons
-                        name="mic"
+                        name={isRecording ? "send" : "mic"}
                         size={24}
                         color="#fff"
+                        style={isRecording ? { marginLeft: 3 } : {}}
                     />
                 </Animated.View>
-            </View>
+            </TouchableOpacity>
         </View>
     );
 };
@@ -223,53 +185,44 @@ const getStyles = (theme: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-end',
+        flex: 1,
     },
     recordingContainer: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         backgroundColor: theme.colors.backgroundCard,
         borderRadius: 25,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         marginRight: 8,
         height: 50,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
     },
-    slideContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+    cancelButton: {
+        padding: 4,
     },
-    slideHint: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    slideText: {
-        fontSize: 14,
-        color: theme.colors.textSecondary,
-        marginLeft: 4,
-    },
-    recordingIndicator: {
+    activeInfo: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     recordingDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: theme.colors.error || '#ff4444',
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: theme.colors.error,
         marginRight: 8,
     },
     durationText: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
         color: theme.colors.textPrimary,
-        minWidth: 45,
-        textAlign: 'right',
+        fontVariant: ['tabular-nums'],
     },
     micButtonContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 50,
+        height: 50,
     },
     micButton: {
         width: 50,
@@ -281,8 +234,8 @@ const getStyles = (theme: any) => StyleSheet.create({
         elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
     },
 });
 

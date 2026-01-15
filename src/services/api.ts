@@ -130,9 +130,9 @@ const ENABLE_API_LOGGING = true;
 const logRequest = (method: string, endpoint: string, body?: any) => {
     if (!ENABLE_API_LOGGING) return;
     console.log(`\n📤 API REQUEST`);
-    console.log(`   ${method} ${API_BASE_URL}${endpoint}`);
+    console.log(`   ${method} ${API_BASE_URL.startsWith('http') ? '' : 'LOCAL:'}${API_BASE_URL}${endpoint}`);
     if (body) {
-        console.log(`   Body:`, JSON.stringify(body, null, 2));
+        console.log(`   Body:`, typeof body === 'string' ? body : JSON.stringify(body, null, 2));
     }
 };
 
@@ -141,14 +141,19 @@ const logResponse = (method: string, endpoint: string, status: number, data: any
     const statusEmoji = status >= 200 && status < 300 ? '✅' : '❌';
     console.log(`\n📥 API RESPONSE ${statusEmoji}`);
     console.log(`   ${method} ${endpoint} - Status: ${status} (${duration}ms)`);
-    console.log(`   Data:`, JSON.stringify(data, null, 2));
+    if (data && typeof data === 'object') {
+        console.log(`   Data:`, JSON.stringify(data, null, 2));
+    } else {
+        console.log(`   Data:`, data);
+    }
 };
 
 const logError = (method: string, endpoint: string, error: any) => {
     if (!ENABLE_API_LOGGING) return;
     console.log(`\n❌ API ERROR`);
-    console.log(`   ${method} ${endpoint}`);
+    console.log(`   ${method} ${API_BASE_URL}${endpoint}`);
     console.log(`   Error:`, error);
+    if (error && error.message) console.log(`   Message:`, error.message);
 };
 
 const logMock = (functionName: string, data: any) => {
@@ -178,7 +183,15 @@ const authFetch = async (endpoint: string, options: RequestInit = {}): Promise<R
     };
 
     // Log request
-    logRequest(method, endpoint, options.body ? JSON.parse(options.body as string) : undefined);
+    if (options.body && typeof options.body === 'string' && headers['Content-Type'] === 'application/json') {
+        try {
+            logRequest(method, endpoint, JSON.parse(options.body));
+        } catch {
+            logRequest(method, endpoint, options.body);
+        }
+    } else {
+        logRequest(method, endpoint, options.body);
+    }
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -195,6 +208,50 @@ const authFetch = async (endpoint: string, options: RequestInit = {}): Promise<R
         }
 
         // Clone response to log it without consuming
+        const clonedResponse = response.clone();
+        const duration = Date.now() - startTime;
+
+        try {
+            const responseData = await clonedResponse.json();
+            logResponse(method, endpoint, response.status, responseData, duration);
+        } catch {
+            logResponse(method, endpoint, response.status, '[Non-JSON response]', duration);
+        }
+
+        return response;
+    } catch (error) {
+        logError(method, endpoint, error);
+        throw error;
+    }
+};
+
+// Helper for authenticated FormData requests (for file uploads)
+const authFetchFormData = async (endpoint: string, formData: FormData, options: RequestInit = {}): Promise<Response> => {
+    const token = await getAuthToken();
+    const method = options.method || 'POST';
+    const startTime = Date.now();
+
+    // IMPORTANT: For FormData, we must NOT set Content-Type header.
+    // The browser/RN will set it automatically with the correct boundary.
+    const headers: Record<string, string> = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers as Record<string, string> || {}),
+    };
+
+    logRequest(method, endpoint, '[FormData Upload]');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            method,
+            headers,
+            body: formData,
+        });
+
+        if (response.status === 401 && onUnauthorizedCallback) {
+            onUnauthorizedCallback();
+        }
+
         const clonedResponse = response.clone();
         const duration = Date.now() - startTime;
 
@@ -1512,15 +1569,7 @@ export const mediaApi = {
                 formData.append('waveformData', JSON.stringify(waveformData));
             }
 
-            const token = await getAuthToken();
-            const response = await fetch(`${API_BASE_URL}/media/voice-note`, {
-                method: 'POST',
-                headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: formData,
-            });
-
+            const response = await authFetchFormData('/media/voice-note', formData);
             const data = await response.json();
 
             if (!data.success) {
@@ -1529,7 +1578,6 @@ export const mediaApi = {
 
             return data.data;
         } catch (error) {
-            logError('POST', '/media/voice-note', error);
             throw error;
         }
     },
