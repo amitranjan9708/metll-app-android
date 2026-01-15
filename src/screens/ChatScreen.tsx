@@ -15,14 +15,14 @@ import {
 import { useTheme } from '../theme/useTheme';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { chatApi, swipeApi, hostApi } from '../services/api';
+import { chatApi, swipeApi, hostApi, mediaApi } from '../services/api';
 import { socketService } from '../services/socket';
-import { Message, User, ChatHostSession, ChatHostMessage } from '../types';
+import { Message, User, ChatHostSession, ChatHostMessage, GifItem } from '../types';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { Alert } from 'react-native';
-import { HostOptInBanner, HostChatView } from '../components';
+import { HostOptInBanner, HostChatView, VoiceNotePlayer, VoiceRecorder, GifPicker } from '../components';
 
 interface ChatParams {
     matchId: number;
@@ -46,6 +46,10 @@ export const ChatScreen: React.FC = () => {
     const [hostMessages, setHostMessages] = useState<ChatHostMessage[]>([]);
     const [showOptIn, setShowOptIn] = useState(false);
     const [waitingForOptIn, setWaitingForOptIn] = useState(false);
+
+    // Voice Notes & GIF state
+    const [isRecording, setIsRecording] = useState(false);
+    const [showGifPicker, setShowGifPicker] = useState(false);
 
     const flatListRef = useRef<FlatList>(null);
 
@@ -396,6 +400,70 @@ export const ChatScreen: React.FC = () => {
         }
     };
 
+    // Voice Note Handlers
+    const handleVoiceRecordingComplete = async (uri: string, duration: number, waveformData: number[]) => {
+        setIsRecording(false);
+        setSending(true);
+
+        try {
+            // Upload voice note
+            const uploadRes = await mediaApi.uploadVoiceNote(uri, waveformData);
+
+            // Send voice note message
+            const msg = await mediaApi.sendVoiceNote(
+                matchId,
+                uploadRes.url,
+                uploadRes.duration || duration,
+                uploadRes.waveformData || waveformData
+            );
+
+            // Add to local list
+            setMessages(prev => [...prev, { ...msg, isOwn: true }]);
+
+            setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+
+        } catch (error: any) {
+            console.error('Send voice note error:', error);
+            Alert.alert("Error", "Failed to send voice note.");
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const handleVoiceRecordingCancel = () => {
+        setIsRecording(false);
+    };
+
+    // GIF Handler
+    const handleGifSelect = async (gif: GifItem) => {
+        setShowGifPicker(false);
+        setSending(true);
+
+        try {
+            const msg = await mediaApi.sendGif(
+                matchId,
+                gif.url,
+                gif.id,
+                gif.width,
+                gif.height
+            );
+
+            // Add to local list
+            setMessages(prev => [...prev, { ...msg, isOwn: true }]);
+
+            setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+
+        } catch (error: any) {
+            console.error('Send GIF error:', error);
+            Alert.alert("Error", "Failed to send GIF.");
+        } finally {
+            setSending(false);
+        }
+    };
     const renderMessage = ({ item }: { item: Message }) => {
         const isOwn = item.isOwn;
 
@@ -418,6 +486,33 @@ export const ChatScreen: React.FC = () => {
                         isLooping
                     />
                 );
+            } else if (item.type === 'voice_note' && item.mediaUrl) {
+                return (
+                    <VoiceNotePlayer
+                        audioUrl={item.mediaUrl}
+                        duration={item.duration || 0}
+                        waveformData={item.waveformData}
+                        isOwn={isOwn}
+                    />
+                );
+            } else if (item.type === 'gif' && item.mediaUrl) {
+                // Calculate proportional height based on width
+                const maxWidth = 200;
+                const gifWidth = item.gifWidth || maxWidth;
+                const gifHeight = item.gifHeight || maxWidth;
+                const displayHeight = Math.min(200, (maxWidth / gifWidth) * gifHeight);
+
+                return (
+                    <Image
+                        source={{ uri: item.mediaUrl }}
+                        style={{
+                            width: maxWidth,
+                            height: displayHeight,
+                            borderRadius: 12,
+                        }}
+                        resizeMode="cover"
+                    />
+                );
             }
             return (
                 <Text style={[
@@ -428,6 +523,7 @@ export const ChatScreen: React.FC = () => {
                 </Text>
             );
         };
+
 
         return (
             <View style={[
@@ -634,30 +730,69 @@ export const ChatScreen: React.FC = () => {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
-                <View style={styles.inputContainer}>
-                    <TouchableOpacity style={styles.attachButton} onPress={handleAttachment} disabled={sending}>
-                        <Ionicons name="add" size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
+                {isRecording ? (
+                    <View style={styles.inputContainer}>
+                        <VoiceRecorder
+                            isVisible={isRecording}
+                            onRecordingComplete={handleVoiceRecordingComplete}
+                            onCancel={handleVoiceRecordingCancel}
+                        />
+                    </View>
+                ) : (
+                    <View style={styles.inputContainer}>
+                        {/* Attachment Button */}
+                        <TouchableOpacity style={styles.attachButton} onPress={handleAttachment} disabled={sending}>
+                            <Ionicons name="add" size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder={hostSession && hostSession.status === 'active' ? "Answer the host..." : "Message..."}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        multiline
-                        editable={!waitingForOptIn}
-                    />
+                        {/* GIF Button */}
+                        <TouchableOpacity
+                            style={styles.gifButton}
+                            onPress={() => setShowGifPicker(true)}
+                            disabled={sending || waitingForOptIn}
+                        >
+                            <Text style={styles.gifButtonText}>GIF</Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                        onPress={handleSend}
-                        disabled={!inputText.trim() || sending}
-                    >
-                        <Ionicons name="send" size={20} color="#fff" />
-                    </TouchableOpacity>
-                </View>
+                        {/* Text Input */}
+                        <TextInput
+                            style={styles.input}
+                            placeholder={hostSession && hostSession.status === 'active' ? "Answer the host..." : "Message..."}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            multiline
+                            editable={!waitingForOptIn}
+                        />
+
+                        {/* Send or Mic Button */}
+                        {inputText.trim() ? (
+                            <TouchableOpacity
+                                style={styles.sendButton}
+                                onPress={handleSend}
+                                disabled={sending}
+                            >
+                                <Ionicons name="send" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.micButton}
+                                onPress={() => setIsRecording(true)}
+                                disabled={sending || waitingForOptIn}
+                            >
+                                <Ionicons name="mic" size={22} color={theme.colors.primary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </KeyboardAvoidingView>
+
+            {/* GIF Picker Modal */}
+            <GifPicker
+                visible={showGifPicker}
+                onClose={() => setShowGifPicker(false)}
+                onSelectGif={handleGifSelect}
+            />
         </SafeAreaView>
     );
 };
@@ -823,6 +958,29 @@ const getStyles = (theme: any) => StyleSheet.create({
     sendButtonDisabled: {
         backgroundColor: theme.colors.border,
     },
+    gifButton: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginRight: 8,
+        borderRadius: 8,
+        borderWidth: 1.5,
+        borderColor: theme.colors.primary,
+        backgroundColor: 'transparent',
+    },
+    gifButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: theme.colors.primary,
+    },
+    micButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: theme.colors.primary + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
     optInBanner: {
         backgroundColor: theme.colors.backgroundCard,
         padding: 16,

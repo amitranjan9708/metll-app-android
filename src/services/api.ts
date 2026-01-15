@@ -1473,6 +1473,242 @@ export const referralApi = {
     }
 };
 
+// ==========================================
+// Media API (Voice Notes & GIFs)
+// ==========================================
+
+export const mediaApi = {
+    /**
+     * Upload voice note to server
+     */
+    uploadVoiceNote: async (audioUri: string, waveformData?: number[]): Promise<{
+        url: string;
+        duration: number;
+        publicId: string;
+        waveformData?: number[];
+    }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return {
+                url: audioUri,
+                duration: 5,
+                publicId: `mock_voice_${Date.now()}`,
+                waveformData: waveformData || [],
+            };
+        }
+
+        try {
+            const formData = new FormData();
+            const filename = audioUri.split('/').pop() || 'voice_note.m4a';
+
+            // @ts-ignore - ReactNative FormData
+            formData.append('audio', {
+                uri: audioUri,
+                name: filename,
+                type: 'audio/m4a',
+            });
+
+            if (waveformData) {
+                formData.append('waveformData', JSON.stringify(waveformData));
+            }
+
+            const token = await getAuthToken();
+            const response = await fetch(`${API_BASE_URL}/media/voice-note`, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to upload voice note');
+            }
+
+            return data.data;
+        } catch (error) {
+            logError('POST', '/media/voice-note', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Send voice note message
+     */
+    sendVoiceNote: async (
+        matchId: number,
+        audioUrl: string,
+        duration: number,
+        waveformData?: number[],
+        transcript?: string
+    ): Promise<any> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                id: Date.now(),
+                type: 'voice_note',
+                mediaUrl: audioUrl,
+                duration,
+                waveformData,
+                transcript,
+                isOwn: true,
+                createdAt: new Date().toISOString(),
+            };
+        }
+
+        try {
+            const response = await authFetch('/media/voice-note/send', {
+                method: 'POST',
+                body: JSON.stringify({
+                    matchId,
+                    audioUrl,
+                    duration,
+                    waveformData,
+                    transcript,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to send voice note');
+            }
+
+            return data.data;
+        } catch (error) {
+            logError('POST', '/media/voice-note/send', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Search GIFs
+     */
+    searchGifs: async (query: string, limit: number = 20, offset: number = 0): Promise<{
+        gifs: Array<{
+            id: string;
+            title: string;
+            url: string;
+            previewUrl: string;
+            width: number;
+            height: number;
+            originalUrl?: string;
+        }>;
+        pagination: { offset: number; count: number; total_count: number };
+    }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                gifs: [],
+                pagination: { offset: 0, count: 0, total_count: 0 },
+            };
+        }
+
+        try {
+            const response = await authFetch(`/media/gifs/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to search GIFs');
+            }
+
+            return data.data;
+        } catch (error) {
+            logError('GET', '/media/gifs/search', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get trending GIFs
+     */
+    getTrendingGifs: async (limit: number = 20, offset: number = 0): Promise<{
+        gifs: Array<{
+            id: string;
+            title: string;
+            url: string;
+            previewUrl: string;
+            width: number;
+            height: number;
+            originalUrl?: string;
+        }>;
+        pagination: { offset: number; count: number; total_count: number };
+    }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                gifs: [],
+                pagination: { offset: 0, count: 0, total_count: 0 },
+            };
+        }
+
+        try {
+            const response = await authFetch(`/media/gifs/trending?limit=${limit}&offset=${offset}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to get trending GIFs');
+            }
+
+            return data.data;
+        } catch (error) {
+            logError('GET', '/media/gifs/trending', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Send GIF message
+     */
+    sendGif: async (
+        matchId: number,
+        gifUrl: string,
+        gifId: string,
+        width?: number,
+        height?: number
+    ): Promise<any> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                id: Date.now(),
+                type: 'gif',
+                mediaUrl: gifUrl,
+                gifId,
+                gifWidth: width,
+                gifHeight: height,
+                isOwn: true,
+                createdAt: new Date().toISOString(),
+            };
+        }
+
+        try {
+            const response = await authFetch('/media/gif/send', {
+                method: 'POST',
+                body: JSON.stringify({
+                    matchId,
+                    gifUrl,
+                    gifId,
+                    width,
+                    height,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to send GIF');
+            }
+
+            return data.data;
+        } catch (error) {
+            logError('POST', '/media/gif/send', error);
+            throw error;
+        }
+    },
+};
+
 // Export API URL for Socket.io
 export const getApiBaseUrl = (): string => {
     // Return base URL without /api for Socket.io

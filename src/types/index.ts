@@ -142,8 +142,19 @@ export interface Message {
   senderId: number;
   senderName?: string;
   content: string | null;
-  type?: 'text' | 'image' | 'video';
+  type?: 'text' | 'image' | 'video' | 'voice_note' | 'gif';
   mediaUrl?: string;
+
+  // Voice Note properties
+  duration?: number;       // Duration in seconds
+  transcript?: string;     // Optional transcription
+  waveformData?: number[]; // Waveform amplitudes for visualization
+
+  // GIF properties
+  gifId?: string;          // Giphy GIF ID
+  gifWidth?: number;       // GIF width
+  gifHeight?: number;      // GIF height
+
   createdAt: string;
   isRead: boolean;
   isOwn?: boolean;
@@ -250,4 +261,32 @@ export interface ChatHostMessage {
     [key: string]: any;
   };
   createdAt: string;
+}
+
+// ==========================================
+// GIF Types
+// ==========================================
+
+export interface GifItem {
+  id: string;
+  title: string;
+  url: string;
+  previewUrl: string;
+  width: number;
+  height: number;
+  originalUrl?: string;
+  originalWidth?: number;
+  originalHeight?: number;
+}
+
+// ==========================================
+// Voice Note Types
+// ==========================================
+
+export interface VoiceNoteUploadResult {
+  url: string;
+  duration: number;
+  publicId: string;
+  waveformData?: number[];
+  type: 'voice_note';
 }

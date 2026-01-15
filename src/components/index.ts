@@ -8,3 +8,6 @@ export { VideoRecorder } from './VideoRecorder';
 export { ThemeSelector } from './ThemeSelector';
 export { HostOptInBanner } from './HostOptInBanner';
 export { HostChatView } from './HostChatView';
+export { VoiceNotePlayer } from './VoiceNotePlayer';
+export { VoiceRecorder } from './VoiceRecorder';
+export { GifPicker } from './GifPicker';
