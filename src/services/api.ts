@@ -850,22 +850,16 @@ export const reportApi = {
     }
 };
 
-if (response.status === 401 && onUnauthorizedCallback) {
-    onUnauthorizedCallback();
-}
+// ==========================================
+// User API
+// ==========================================
 
-return data;
-        } catch (error) {
-    logError('POST', '/user/verification-video', error);
-    throw error;
-}
-    },
-
-/**
- * Get user profile from backend
- * GET /api/user/profile
- */
-getUserProfile: async (): Promise<{ success: boolean; message?: string; data?: { user: any } }> => {
+export const userApi = {
+    /**
+     * Get user profile from backend
+     * GET /api/user/profile
+     */
+    getUserProfile: async (): Promise<{ success: boolean; message?: string; data?: { user: any } }> => {
     // Check cache first
     const cached = await cache.getUserProfile();
     if (cached) {
@@ -1023,19 +1017,26 @@ export const swipeApi = {
      */
     getProfiles: async (): Promise<Profile[]> => {
         // Check cache first
-        const cached = await cache.getProfiles();
-        if (cached && cached.length > 0) {
+        const cachedWithAge = await cache.getProfilesWithAge();
+        if (cachedWithAge && cachedWithAge.data.length > 0) {
             console.log('📦 Using cached profiles');
-            // Still fetch in background to update cache
-            authFetch('/swipe/profiles')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data) {
-                        cache.setProfiles(data.data);
-                    }
-                })
-                .catch(err => console.error('Background profile fetch error:', err));
-            return cached;
+            // Only refresh in background if cache is getting stale (more than 50% of expiry time)
+            const PROFILES_CACHE_EXPIRY = 60 * 1000; // 1 minute
+            const STALE_THRESHOLD = PROFILES_CACHE_EXPIRY * 0.5; // 50% = 30 seconds
+            if (cachedWithAge.age > STALE_THRESHOLD) {
+                console.log('🔄 Profiles cache is getting stale, refreshing in background...');
+                authFetch('/swipe/profiles')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.data) {
+                            cache.setProfiles(data.data);
+                        }
+                    })
+                    .catch(err => console.error('Background profile fetch error:', err));
+            } else {
+                console.log('✅ Profiles cache is fresh, skipping background refresh');
+            }
+            return cachedWithAge.data;
         }
 
         if (USE_MOCK_DATA) {
@@ -1129,19 +1130,26 @@ export const swipeApi = {
      */
     getMatches: async (): Promise<MatchData[]> => {
         // Check cache first
-        const cached = await cache.getMatches();
-        if (cached) {
+        const cachedWithAge = await cache.getMatchesWithAge();
+        if (cachedWithAge) {
             console.log('📦 Using cached matches');
-            // Still fetch in background to update cache
-            authFetch('/swipe/matches')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data) {
-                        cache.setMatches(data.data);
-                    }
-                })
-                .catch(err => console.error('Background matches fetch error:', err));
-            return cached;
+            // Only refresh in background if cache is getting stale (more than 50% of expiry time)
+            const MATCHES_CACHE_EXPIRY = 2 * 60 * 1000; // 2 minutes
+            const STALE_THRESHOLD = MATCHES_CACHE_EXPIRY * 0.5; // 50% = 1 minute
+            if (cachedWithAge.age > STALE_THRESHOLD) {
+                console.log('🔄 Matches cache is getting stale, refreshing in background...');
+                authFetch('/swipe/matches')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.data) {
+                            cache.setMatches(data.data);
+                        }
+                    })
+                    .catch(err => console.error('Background matches fetch error:', err));
+            } else {
+                console.log('✅ Matches cache is fresh, skipping background refresh');
+            }
+            return cachedWithAge.data;
         }
 
         if (USE_MOCK_DATA) {
@@ -1259,19 +1267,26 @@ export const swipeApi = {
      */
     getWhoLikedMe: async (): Promise<Profile[]> => {
         // Check cache first
-        const cached = await cache.getWhoLikedMe();
-        if (cached) {
+        const cachedWithAge = await cache.getWhoLikedMeWithAge();
+        if (cachedWithAge) {
             console.log('📦 Using cached who liked me');
-            // Still fetch in background to update cache
-            authFetch('/swipe/likes')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data) {
-                        cache.setWhoLikedMe(data.data);
-                    }
-                })
-                .catch(err => console.error('Background who liked me fetch error:', err));
-            return cached;
+            // Only refresh in background if cache is getting stale (more than 50% of expiry time)
+            const WHO_LIKED_ME_CACHE_EXPIRY = 2 * 60 * 1000; // 2 minutes
+            const STALE_THRESHOLD = WHO_LIKED_ME_CACHE_EXPIRY * 0.5; // 50% = 1 minute
+            if (cachedWithAge.age > STALE_THRESHOLD) {
+                console.log('🔄 Who liked me cache is getting stale, refreshing in background...');
+                authFetch('/swipe/likes')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.data) {
+                            cache.setWhoLikedMe(data.data);
+                        }
+                    })
+                    .catch(err => console.error('Background who liked me fetch error:', err));
+            } else {
+                console.log('✅ Who liked me cache is fresh, skipping background refresh');
+            }
+            return cachedWithAge.data;
         }
 
         if (USE_MOCK_DATA) {
@@ -1324,19 +1339,27 @@ export const chatApi = {
      */
     getChatRoom: async (matchId: number): Promise<ChatRoomData> => {
         // Check cache first (shorter expiry for chat)
-        const cached = await cache.getChatRoom(matchId);
-        if (cached) {
+        const cachedWithAge = await cache.getChatRoomWithAge(matchId);
+        if (cachedWithAge) {
             console.log('📦 Using cached chat room');
-            // Still fetch in background to update cache
-            authFetch(`/chat/${matchId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data) {
-                        cache.setChatRoom(matchId, data.data);
-                    }
-                })
-                .catch(err => console.error('Background chat fetch error:', err));
-            return cached;
+            // Only refresh in background if cache is getting stale (more than 50% of expiry time)
+            // Chat room cache expires in 30 seconds, so refresh if older than 15 seconds
+            const CHAT_CACHE_EXPIRY = 30 * 1000; // 30 seconds
+            const STALE_THRESHOLD = CHAT_CACHE_EXPIRY * 0.5; // 50% = 15 seconds
+            if (cachedWithAge.age > STALE_THRESHOLD) {
+                console.log('🔄 Cache is getting stale, refreshing in background...');
+                authFetch(`/chat/${matchId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.data) {
+                            cache.setChatRoom(matchId, data.data);
+                        }
+                    })
+                    .catch(err => console.error('Background chat fetch error:', err));
+            } else {
+                console.log('✅ Cache is fresh, skipping background refresh');
+            }
+            return cachedWithAge.data;
         }
 
         if (USE_MOCK_DATA) {

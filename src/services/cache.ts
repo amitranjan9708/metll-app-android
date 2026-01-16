@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Profile, MatchData, ChatRoomData } from '../types';
+import { Profile, MatchData } from '../types';
+
+// ChatRoomData is defined in api.ts, but we'll use a generic type here
+type ChatRoomData = any;
 
 // Cache keys
 const CACHE_KEYS = {
@@ -57,6 +60,35 @@ class CacheService {
 
             console.log(`✅ Cache hit for ${key} (age: ${Math.round(age / 1000)}s)`);
             return entry.data;
+        } catch (error) {
+            console.error(`Error reading cache for ${key}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Get cached data with age information
+     * Returns { data, age } if cache exists and is valid, null otherwise
+     */
+    async getWithAge<T>(key: string, maxAge: number): Promise<{ data: T; age: number } | null> {
+        try {
+            const cached = await AsyncStorage.getItem(key);
+            if (!cached) {
+                return null;
+            }
+
+            const entry: CacheEntry<T> = JSON.parse(cached);
+            const age = Date.now() - entry.timestamp;
+
+            if (age > maxAge) {
+                // Cache expired, remove it
+                await AsyncStorage.removeItem(key);
+                console.log(`🗑️ Cache expired for ${key}`);
+                return null;
+            }
+
+            console.log(`✅ Cache hit for ${key} (age: ${Math.round(age / 1000)}s)`);
+            return { data: entry.data, age };
         } catch (error) {
             console.error(`Error reading cache for ${key}:`, error);
             return null;
@@ -172,6 +204,9 @@ export const cache = {
     getMatches: async (): Promise<MatchData[] | null> => {
         return cacheService.get(CACHE_KEYS.MATCHES, CACHE_EXPIRY.MATCHES);
     },
+    getMatchesWithAge: async (): Promise<{ data: MatchData[]; age: number } | null> => {
+        return cacheService.getWithAge(CACHE_KEYS.MATCHES, CACHE_EXPIRY.MATCHES);
+    },
     setMatches: async (matches: MatchData[]): Promise<void> => {
         return cacheService.set(CACHE_KEYS.MATCHES, matches);
     },
@@ -182,6 +217,9 @@ export const cache = {
     // Profiles (swipe profiles)
     getProfiles: async (): Promise<Profile[] | null> => {
         return cacheService.get(CACHE_KEYS.PROFILES, CACHE_EXPIRY.PROFILES);
+    },
+    getProfilesWithAge: async (): Promise<{ data: Profile[]; age: number } | null> => {
+        return cacheService.getWithAge(CACHE_KEYS.PROFILES, CACHE_EXPIRY.PROFILES);
     },
     setProfiles: async (profiles: Profile[]): Promise<void> => {
         return cacheService.set(CACHE_KEYS.PROFILES, profiles);
@@ -194,6 +232,9 @@ export const cache = {
     getWhoLikedMe: async (): Promise<Profile[] | null> => {
         return cacheService.get(CACHE_KEYS.WHO_LIKED_ME, CACHE_EXPIRY.WHO_LIKED_ME);
     },
+    getWhoLikedMeWithAge: async (): Promise<{ data: Profile[]; age: number } | null> => {
+        return cacheService.getWithAge(CACHE_KEYS.WHO_LIKED_ME, CACHE_EXPIRY.WHO_LIKED_ME);
+    },
     setWhoLikedMe: async (profiles: Profile[]): Promise<void> => {
         return cacheService.set(CACHE_KEYS.WHO_LIKED_ME, profiles);
     },
@@ -204,6 +245,9 @@ export const cache = {
     // Chat Room
     getChatRoom: async (matchId: number): Promise<ChatRoomData | null> => {
         return cacheService.get(CACHE_KEYS.CHAT_ROOM(matchId), CACHE_EXPIRY.CHAT_ROOM);
+    },
+    getChatRoomWithAge: async (matchId: number): Promise<{ data: ChatRoomData; age: number } | null> => {
+        return cacheService.getWithAge(CACHE_KEYS.CHAT_ROOM(matchId), CACHE_EXPIRY.CHAT_ROOM);
     },
     setChatRoom: async (matchId: number, chatRoom: ChatRoomData): Promise<void> => {
         return cacheService.set(CACHE_KEYS.CHAT_ROOM(matchId), chatRoom);
