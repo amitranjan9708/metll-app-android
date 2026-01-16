@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
-import { authApi } from '../services/api';
+import { userApi } from '../services/api';
 
 const PROFILE_CACHE_KEY = '@user_profile_cache';
 
@@ -75,7 +75,7 @@ export const EditOfficeScreen: React.FC = () => {
                 designation: officeDesignation,
             } : null;
 
-            const response = await authApi.updateProfile({ office: officeData });
+            const response = await userApi.updateProfile({ office: officeData });
 
             if (response.success) {
                 const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);

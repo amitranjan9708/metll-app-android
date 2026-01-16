@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
-import { authApi, setOnUnauthorizedCallback } from '../services/api';
+import { authApi, userApi, setOnUnauthorizedCallback } from '../services/api';
 import { cache } from '../services/cache';
 
 interface AuthContextType {
@@ -52,12 +52,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         AsyncStorage.getItem('user'),
         AsyncStorage.getItem('authToken')
       ]);
-      
+
       console.log('📱 Loading user data:', {
         hasUserData: !!userData,
         hasToken: !!token
       });
-      
+
       if (!userData) {
         // No local user, stay logged out
         console.log('📱 No local user data found');
@@ -71,14 +71,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       let parsedUser = JSON.parse(userData);
-      console.log('📱 Loaded local user:', { 
-        id: parsedUser.id, 
+      console.log('📱 Loaded local user:', {
+        id: parsedUser.id,
         name: parsedUser.name,
         isOnboarded: parsedUser.isOnboarded,
         hasPhoto: !!parsedUser.photo,
         hasSituationResponses: parsedUser.situationResponses?.length || 0
       });
-      
+
       // MIGRATION: If user doesn't have isOnboarded flag locally,
       // use the backend value or default to false (will need to complete onboarding)
       if (parsedUser.isOnboarded === undefined) {
@@ -86,28 +86,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         parsedUser = { ...parsedUser, isOnboarded: false };
         await AsyncStorage.setItem('user', JSON.stringify(parsedUser));
       }
-      
+
       // Set user from local storage IMMEDIATELY - LOCAL DATA IS PRIMARY
       setUser(parsedUser);
-      
+
       // Only validate session if user is already onboarded AND we have a token
       // This prevents overwriting local onboarding data
       if (parsedUser.isOnboarded && token) {
         console.log('🔍 User is onboarded and has token, validating session with backend...');
         try {
           const validation = await authApi.validateSession();
-          
+
           if (!validation.valid) {
             // User was deleted or token is invalid
             console.warn('❌ Session invalid:', validation.message);
             // Only logout if it's a REAL 401 auth error (user deleted/token invalid)
             // Don't logout on network errors, connection issues, or "No token found" (which shouldn't happen here)
-            const isRealAuthError = validation.message && 
-              !validation.message.includes('Network') && 
+            const isRealAuthError = validation.message &&
+              !validation.message.includes('Network') &&
               !validation.message.includes('No token') &&
               !validation.message.includes('offline') &&
               !validation.message.includes('Failed to fetch');
-            
+
             if (isRealAuthError) {
               console.log('🔒 Real auth error detected, logging out...');
               await handleForceLogout();
@@ -119,8 +119,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('✅ Session valid');
             // Merge backend data but PRESERVE local isOnboarded flag
             if (validation.user) {
-              const updatedUser = { 
-                ...parsedUser, 
+              const updatedUser = {
+                ...parsedUser,
                 ...validation.user,
                 isOnboarded: parsedUser.isOnboarded, // ALWAYS preserve local onboarding status
               };
@@ -164,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Save user data to AsyncStorage
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       console.log('✅ User saved to AsyncStorage');
-      
+
       // Verify it was saved
       const saved = await AsyncStorage.getItem('user');
       if (saved) {
@@ -172,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         console.error('❌ Failed to verify user data persistence');
       }
-      
+
       // Also verify token exists
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         console.warn('⚠️ No auth token found in storage after login');
       }
-      
+
       setUser(userData);
       console.log('✅ User state updated, isAuthenticated will be true');
     } catch (error) {
@@ -193,18 +193,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Clear all cache first
       await cache.clearAll();
-      
+
       // Clear all user-related data from local storage
       const keysToRemove = [
         'user',
         '@user_profile_cache',
         'authToken',
       ];
-      
+
       // Also clear chat storage (if exists)
       const allKeys = await AsyncStorage.getAllKeys();
       const chatKeys = allKeys.filter(k => k.startsWith('@chat_') || k.startsWith('@chat_sync_'));
-      
+
       await AsyncStorage.multiRemove([...keysToRemove, ...chatKeys]);
       setUser(null);
       console.log('✅ All local data and cache cleared on logout');
@@ -217,7 +217,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(currentUser => {
       if (!currentUser) return null;
       const updatedUser = { ...currentUser, ...userData };
-      
+
       // Save to AsyncStorage asynchronously (non-blocking)
       AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(err => {
         console.error('Error updating user in AsyncStorage:', err);
@@ -238,11 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (userData.homeLocation) syncData.homeLocation = userData.homeLocation;
       if (userData.situationResponses) syncData.situationResponses = userData.situationResponses;
       if (userData.name) syncData.name = userData.name;
-      
+
       // Only call API if we have data to sync
       if (Object.keys(syncData).length > 0) {
         console.log('📤 Syncing profile with backend:', Object.keys(syncData));
-        authApi.updateProfile(syncData)
+        userApi.updateProfile(syncData)
           .then(result => {
             if (result.success) {
               console.log('✅ Profile synced with backend');
@@ -265,12 +265,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(currentUser => {
       if (!currentUser) return null;
       const updatedUser = { ...currentUser, isOnboarded: true };
-      
+
       // Save to AsyncStorage
       AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(err => {
         console.error('Error saving onboarding status:', err);
       });
-      
+
       return updatedUser;
     });
   }, []);

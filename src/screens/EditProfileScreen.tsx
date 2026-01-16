@@ -16,7 +16,7 @@ import { theme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { authApi } from '../services/api';
+import { authApi, userApi } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PROFILE_CACHE_KEY = '@user_profile_cache';
@@ -68,7 +68,7 @@ export const EditProfileScreen: React.FC = () => {
       }
 
       // Fetch fresh data
-      const response = await authApi.getUserProfile();
+      const response = await userApi.getUserProfile();
       if (response.success && response.data?.user) {
         const data = response.data.user;
         setProfileData(data);
@@ -118,7 +118,7 @@ export const EditProfileScreen: React.FC = () => {
         updateData = { homeLocation: { current: { city: currentCity }, past: { city: pastCity } } };
       }
 
-      const response = await authApi.updateProfile(updateData);
+      const response = await userApi.updateProfile(updateData);
       if (response.success) {
         await loadProfile();
         setEditingSection(null);

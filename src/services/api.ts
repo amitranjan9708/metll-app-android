@@ -893,7 +893,7 @@ export const userApi = {
                     },
                 },
             };
-            logMock('authApi.getUserProfile()', mockResponse);
+            logMock('userApi.getUserProfile()', mockResponse);
             if (mockResponse.data?.user) {
                 await cache.setUserProfile(mockResponse.data.user);
             }
@@ -949,7 +949,7 @@ export const userApi = {
                 message: 'Profile updated successfully',
                 data: profileData,
             };
-            logMock('authApi.updateProfile()', mockResponse);
+            logMock('userApi.updateProfile()', mockResponse);
             return mockResponse;
         }
 

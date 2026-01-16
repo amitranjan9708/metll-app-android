@@ -37,36 +37,36 @@ export interface SituationResponse {
 
 export interface SchoolDetails {
   name: string;
-  location: string;
+  location?: string;
   city: string;
-  state: string;
+  state?: string;
   class?: string;
   section?: string;
 }
 
 export interface CollegeDetails {
   name: string;
-  department: string;
-  location: string;
+  department?: string;
+  location?: string;
 }
 
 export interface OfficeDetails {
   name: string;
-  location: string;
-  department: string;
+  location?: string;
+  department?: string;
   designation: string;
 }
 
 export interface LocationDetails {
   current?: {
-    address: string;
-    city: string;
-    state: string;
+    address?: string;
+    city?: string;
+    state?: string;
   };
   past?: {
-    address: string;
-    city: string;
-    state: string;
+    address?: string;
+    city?: string;
+    state?: string;
   };
 }
 

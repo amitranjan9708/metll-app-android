@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
-import { authApi } from '../services/api';
+import { userApi } from '../services/api';
 
 const PROFILE_CACHE_KEY = '@user_profile_cache';
 
@@ -72,7 +72,7 @@ export const EditCollegeScreen: React.FC = () => {
                 location: collegeLocation || undefined,
             } : null;
 
-            const response = await authApi.updateProfile({ college: collegeData });
+            const response = await userApi.updateProfile({ college: collegeData });
 
             if (response.success) {
                 const cachedData = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
