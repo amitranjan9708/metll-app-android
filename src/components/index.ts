@@ -12,3 +12,5 @@ export { HostChatView } from './HostChatView';
 export { VoiceNotePlayer } from './VoiceNotePlayer';
 export { VoiceRecorder } from './VoiceRecorder';
 export { GifPicker } from './GifPicker';
+export { ChatMenu } from './ChatMenu';
+

@@ -22,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { Alert } from 'react-native';
-import { HostOptInBanner, HostChatView, VoiceNotePlayer, VoiceRecorder, GifPicker, ReportModal } from '../components';
+import { HostOptInBanner, HostChatView, VoiceNotePlayer, VoiceRecorder, GifPicker, ReportModal, ChatMenu } from '../components';
 
 interface ChatParams {
     matchId: number;
@@ -193,9 +193,9 @@ export const ChatScreen: React.FC = () => {
 
     const loadMatchDetails = async () => {
         try {
-            const response = await swipeApi.getMatch(matchId);
-            if (response.success && response.data) {
-                setOtherUserId(response.data.matchedUser.id);
+            const matchData = await swipeApi.getMatch(matchId);
+            if (matchData && matchData.matchedUser) {
+                setOtherUserId(matchData.matchedUser.id);
             }
         } catch (error) {
             console.error('Failed to load match details:', error);
@@ -330,36 +330,58 @@ export const ChatScreen: React.FC = () => {
         }
     };
 
+    // Chat Menu Options
+    const [showChatMenu, setShowChatMenu] = useState(false);
+
+    // Calculate menu position relative to the button if needed, 
+    // but simplified fixed positioning works better for now with the modal overlay.
+    // For a real anchor, we would measure the button. 
+    // Here we'll just use top-right positioning in the ChatMenu component style default.
+
     const handleOptions = () => {
+        setShowChatMenu(true);
+    };
+
+    const confirmUnmatch = async () => {
         Alert.alert(
-            "Chat Options",
-            "What would you like to do?",
+            "Unmatch",
+            "Are you sure? You will lose this chat and match permanently.",
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Block & Report",
+                    text: "Unmatch",
                     style: "destructive",
-                    onPress: () => setShowReportModal(true)
-                },
-                {
-                    text: "Unmatch Only",
-                    style: "destructive",
-                    onPress: confirmUnmatch
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await swipeApi.unmatch(matchId);
+                            navigation.goBack();
+                        } catch (error: any) {
+                            Alert.alert("Error", error.message || "Failed to unmatch.");
+                            setLoading(false);
+                        }
+                    }
                 }
             ]
         );
     };
 
-    const confirmUnmatch = async () => {
-        try {
-            setLoading(true);
-            await swipeApi.unmatch(matchId);
-            navigation.goBack();
-        } catch (error: any) {
-            Alert.alert("Error", error.message || "Failed to unmatch.");
-            setLoading(false);
-        }
+    const handleBlockReport = () => {
+        setShowReportModal(true);
     };
+
+    const menuOptions = [
+        {
+            label: "Block & Report",
+            action: handleBlockReport,
+            type: 'destructive' as const
+        },
+        {
+            label: "Unmatch Only",
+            action: confirmUnmatch,
+            type: 'destructive' as const
+        }
+    ];
 
     const handleAttachment = async () => {
         try {
@@ -711,6 +733,24 @@ export const ChatScreen: React.FC = () => {
                     <Ionicons name="ellipsis-vertical" size={24} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
             </View>
+
+            <ChatMenu
+                visible={showChatMenu}
+                onClose={() => setShowChatMenu(false)}
+                options={menuOptions}
+                anchorPosition={Platform.OS === 'ios' ? { top: 100, right: 20 } : { top: 60, right: 10 }}
+            />
+
+            <ReportModal
+                visible={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                matchId={matchId}
+                reportedUserId={otherUserId} // Fallback
+                onSuccess={() => {
+                    setShowReportModal(false);
+                    navigation.goBack();
+                }}
+            />
 
             {loading ? (
                 <View style={styles.loadingContainer}>

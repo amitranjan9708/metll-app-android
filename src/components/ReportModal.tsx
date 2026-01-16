@@ -20,7 +20,8 @@ import { reportApi } from '../services/api';
 interface ReportModalProps {
     visible: boolean;
     onClose: () => void;
-    reportedUserId: number;
+    reportedUserId?: number; // Optional if matchId is provided
+    matchId?: number;        // Optional, improves backend resolution
     onSuccess: () => void;
 }
 
@@ -32,7 +33,7 @@ const REPORT_CATEGORIES = [
     "Other"
 ];
 
-export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, reportedUserId, onSuccess }) => {
+export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, reportedUserId, matchId, onSuccess }) => {
     const theme = useTheme();
     const styles = getStyles(theme);
 
@@ -51,15 +52,25 @@ export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, repo
             return;
         }
 
+        if (!reportedUserId && !matchId) {
+            Alert.alert("Error", "Internal Error: No user or match ID to report.");
+            return;
+        }
+
         setLoading(true);
         try {
-            await reportApi.submitReport(reportedUserId, selectedCategory, reason);
-            Alert.alert("Success", "User reported and blocked.", [
+            await reportApi.submitReport(
+                reportedUserId || 0, // Fallback, backend will use matchId if provided
+                selectedCategory,
+                reason,
+                matchId
+            );
+            Alert.alert("Report Submitted", "User reported and blocked. You won't see them again.", [
                 { text: "OK", onPress: onSuccess }
             ]);
         } catch (error: any) {
             console.error('Report error:', error);
-            Alert.alert("Error", "Failed to submit report. Please try again.");
+            Alert.alert("Error", error.message || "Failed to submit report. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -84,19 +95,19 @@ export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, repo
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View style={styles.overlay}>
                     <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                         style={styles.keyboardView}
                     >
                         <View style={styles.modalContainer}>
                             <View style={styles.header}>
-                                <Text style={styles.title}>Report User</Text>
-                                <TouchableOpacity onPress={handleClose} disabled={loading}>
-                                    <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                                <Text style={styles.title}>Block & Report</Text>
+                                <TouchableOpacity onPress={handleClose} disabled={loading} style={styles.closeButton}>
+                                    <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                                 </TouchableOpacity>
                             </View>
 
                             <Text style={styles.subtitle}>
-                                Please let us know why you are reporting this user. This will also block them permanently.
+                                Why are you reporting this user? We won't let them know.
                             </Text>
 
                             <View style={styles.categoriesContainer}>
@@ -120,10 +131,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, repo
                                 ))}
                             </View>
 
-                            <Text style={styles.label}>Additional Comments (Required)</Text>
+                            <Text style={styles.label}>Details (Required)</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Describe the issue..."
+                                placeholder="Please explain what happened..."
                                 placeholderTextColor={theme.colors.textSecondary}
                                 value={reason}
                                 onChangeText={setReason}
@@ -133,14 +144,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, repo
                             />
 
                             <TouchableOpacity
-                                style={[styles.submitButton, loading && styles.disabledButton]}
+                                style={[
+                                    styles.submitButton,
+                                    loading && styles.disabledButton,
+                                    (!selectedCategory || !reason.trim()) && styles.disabledButton // Visual disable if incomplete
+                                ]}
                                 onPress={handleSubmit}
                                 disabled={loading}
                             >
                                 {loading ? (
                                     <ActivityIndicator color="#fff" />
                                 ) : (
-                                    <Text style={styles.submitButtonText}>Submit Report</Text>
+                                    <Text style={styles.submitButtonText}>Block & Report</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -154,7 +169,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, repo
 const getStyles = (theme: any) => StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.6)', // Slightly darker overlay
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -164,40 +179,51 @@ const getStyles = (theme: any) => StyleSheet.create({
     },
     modalContainer: {
         width: '90%',
-        backgroundColor: theme.colors.card,
-        borderRadius: 20,
-        padding: 20,
-        maxHeight: '80%',
+        backgroundColor: theme.colors.card, // Should use a proper dark card color
+        borderRadius: 24,
+        padding: 24,
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 8,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 12,
     },
     title: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
         color: theme.colors.textPrimary,
+    },
+    closeButton: {
+        padding: 4,
     },
     subtitle: {
         fontSize: 14,
         color: theme.colors.textSecondary,
-        marginBottom: 20,
+        marginBottom: 24,
+        lineHeight: 20,
     },
     categoriesContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginBottom: 20,
+        marginBottom: 24,
         gap: 10,
     },
     categoryButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
         borderRadius: 20,
+        backgroundColor: theme.colors.background, // Should contrast slightly with card
         borderWidth: 1,
         borderColor: theme.colors.border,
-        backgroundColor: 'transparent',
         marginBottom: 8,
         marginRight: 8,
     },
@@ -208,6 +234,7 @@ const getStyles = (theme: any) => StyleSheet.create({
     categoryText: {
         color: theme.colors.textPrimary,
         fontSize: 14,
+        fontWeight: '500',
     },
     categoryTextSelected: {
         color: '#fff',
@@ -221,23 +248,25 @@ const getStyles = (theme: any) => StyleSheet.create({
     },
     input: {
         backgroundColor: theme.colors.background,
-        borderRadius: 12,
-        padding: 12,
+        borderRadius: 16,
+        padding: 16,
         color: theme.colors.textPrimary,
-        height: 100,
+        height: 120,
         textAlignVertical: 'top',
-        marginBottom: 20,
+        marginBottom: 24,
         borderWidth: 1,
         borderColor: theme.colors.border,
+        fontSize: 15,
     },
     submitButton: {
-        backgroundColor: theme.colors.error || '#FF4444', // Red for report action usually, or primary? User said "Block & Report", usually red.
-        paddingVertical: 14,
-        borderRadius: 12,
+        backgroundColor: theme.colors.error || '#FF4444',
+        paddingVertical: 16,
+        borderRadius: 16,
         alignItems: 'center',
+        marginTop: 8,
     },
     disabledButton: {
-        opacity: 0.7,
+        opacity: 0.5,
     },
     submitButtonText: {
         color: '#fff',
