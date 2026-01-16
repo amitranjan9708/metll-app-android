@@ -4,6 +4,7 @@ export { OTPInput } from './OTPInput';
 export { ImagePickerComponent } from './ImagePicker';
 export { Card } from './Card';
 export { VerificationBadge } from './VerificationBadge';
+export { ReportModal } from './ReportModal';
 export { VideoRecorder } from './VideoRecorder';
 export { ThemeSelector } from './ThemeSelector';
 export { HostOptInBanner } from './HostOptInBanner';

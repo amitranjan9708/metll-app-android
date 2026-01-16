@@ -22,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { Alert } from 'react-native';
-import { HostOptInBanner, HostChatView, VoiceNotePlayer, VoiceRecorder, GifPicker } from '../components';
+import { HostOptInBanner, HostChatView, VoiceNotePlayer, VoiceRecorder, GifPicker, ReportModal } from '../components';
 
 interface ChatParams {
     matchId: number;
@@ -46,16 +46,19 @@ export const ChatScreen: React.FC = () => {
     const [hostMessages, setHostMessages] = useState<ChatHostMessage[]>([]);
     const [showOptIn, setShowOptIn] = useState(false);
     const [waitingForOptIn, setWaitingForOptIn] = useState(false);
+    const [otherUserId, setOtherUserId] = useState<number>(0);
 
     // Voice Notes & GIF state
     const [isRecording, setIsRecording] = useState(false);
     const [showGifPicker, setShowGifPicker] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
 
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
         loadChat();
         loadHostSession();
+        loadMatchDetails();
 
         // Connect and join socket room
         socketService.connect();
@@ -188,6 +191,17 @@ export const ChatScreen: React.FC = () => {
         }
     };
 
+    const loadMatchDetails = async () => {
+        try {
+            const response = await swipeApi.getMatch(matchId);
+            if (response.success && response.data) {
+                setOtherUserId(response.data.matchedUser.id);
+            }
+        } catch (error) {
+            console.error('Failed to load match details:', error);
+        }
+    };
+
     const handleOptIn = async () => {
         try {
             setWaitingForOptIn(true);
@@ -316,13 +330,22 @@ export const ChatScreen: React.FC = () => {
         }
     };
 
-    const handleUnmatch = () => {
+    const handleOptions = () => {
         Alert.alert(
-            "Unmatch User",
-            "Are you sure you want to unmatch? This action cannot be undone and you will lose your chat history.",
+            "Chat Options",
+            "What would you like to do?",
             [
                 { text: "Cancel", style: "cancel" },
-                { text: "Unmatch", style: "destructive", onPress: confirmUnmatch }
+                {
+                    text: "Block & Report",
+                    style: "destructive",
+                    onPress: () => setShowReportModal(true)
+                },
+                {
+                    text: "Unmatch Only",
+                    style: "destructive",
+                    onPress: confirmUnmatch
+                }
             ]
         );
     };
@@ -684,7 +707,7 @@ export const ChatScreen: React.FC = () => {
                 >
                     <Text style={styles.hostButtonText}>🤖</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.optionButton} onPress={handleUnmatch}>
+                <TouchableOpacity style={styles.optionButton} onPress={handleOptions}>
                     <Ionicons name="ellipsis-vertical" size={24} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
             </View>
@@ -792,6 +815,17 @@ export const ChatScreen: React.FC = () => {
                 visible={showGifPicker}
                 onClose={() => setShowGifPicker(false)}
                 onSelectGif={handleGifSelect}
+            />
+
+            {/* Report Modal */}
+            <ReportModal
+                visible={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                reportedUserId={otherUserId}
+                onSuccess={() => {
+                    setShowReportModal(false);
+                    navigation.goBack();
+                }}
             />
         </SafeAreaView>
     );

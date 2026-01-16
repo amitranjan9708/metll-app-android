@@ -809,70 +809,121 @@ export const authApi = {
             throw error;
         }
     },
+};
 
+// ==========================================
+// Report API
+// ==========================================
+
+export const reportApi = {
     /**
-     * Get user profile from backend
-     * GET /api/user/profile
+     * Report and block a user
      */
-    getUserProfile: async (): Promise<{ success: boolean; message?: string; data?: { user: any } }> => {
-        // Check cache first
-        const cached = await cache.getUserProfile();
-        if (cached) {
-            console.log('📦 Using cached user profile');
-            return { success: true, data: { user: cached } };
-        }
-
+    submitReport: async (reportedUserId: number, category: string, reason: string): Promise<{ success: boolean; message: string }> => {
         if (USE_MOCK_DATA) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const mockResponse = {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return {
                 success: true,
-                data: {
-                    user: {
-                        id: '1',
-                        name: 'User',
-                        email: 'user@example.com',
-                        phone: '+919876543210',
-                        photo: null,
-                        additionalPhotos: [],
-                        verificationVideo: null,
-                        school: null,
-                        college: null,
-                        office: null,
-                        homeLocation: null,
-                        situationResponses: null,
-                    },
-                },
+                message: 'User reported and blocked successfully.',
             };
-            logMock('authApi.getUserProfile()', mockResponse);
-            if (mockResponse.data?.user) {
-                await cache.setUserProfile(mockResponse.data.user);
-            }
-            return mockResponse;
         }
 
         try {
-            logRequest('GET', '/user/profile', undefined);
+            const body = { reportedUserId, category, reason };
+            logRequest('POST', '/report', body);
             const startTime = Date.now();
 
-            const response = await authFetch('/user/profile', {
-                method: 'GET',
+            const response = await authFetch('/report', {
+                method: 'POST',
+                body: JSON.stringify(body),
             });
 
             const data = await response.json();
             const duration = Date.now() - startTime;
-            logResponse('GET', '/user/profile', response.status, data, duration);
-
-            // Cache the user profile
-            if (data.success && data.data?.user) {
-                await cache.setUserProfile(data.data.user);
-            }
+            logResponse('POST', '/report', response.status, data, duration);
 
             return data;
         } catch (error) {
-            logError('GET', '/user/profile', error);
+            logError('POST', '/report', error);
             throw error;
         }
+    }
+};
+
+if (response.status === 401 && onUnauthorizedCallback) {
+    onUnauthorizedCallback();
+}
+
+return data;
+        } catch (error) {
+    logError('POST', '/user/verification-video', error);
+    throw error;
+}
     },
+
+/**
+ * Get user profile from backend
+ * GET /api/user/profile
+ */
+getUserProfile: async (): Promise<{ success: boolean; message?: string; data?: { user: any } }> => {
+    // Check cache first
+    const cached = await cache.getUserProfile();
+    if (cached) {
+        console.log('📦 Using cached user profile');
+        return { success: true, data: { user: cached } };
+    }
+
+    if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const mockResponse = {
+            success: true,
+            data: {
+                user: {
+                    id: '1',
+                    name: 'User',
+                    email: 'user@example.com',
+                    phone: '+919876543210',
+                    photo: null,
+                    additionalPhotos: [],
+                    verificationVideo: null,
+                    school: null,
+                    college: null,
+                    office: null,
+                    homeLocation: null,
+                    situationResponses: null,
+                },
+            },
+        };
+        logMock('authApi.getUserProfile()', mockResponse);
+        if (mockResponse.data?.user) {
+            await cache.setUserProfile(mockResponse.data.user);
+        }
+        return mockResponse;
+    }
+
+    try {
+        logRequest('GET', '/user/profile', undefined);
+        const startTime = Date.now();
+
+        const response = await authFetch('/user/profile', {
+            method: 'GET',
+        });
+
+        const data = await response.json();
+        const duration = Date.now() - startTime;
+        logResponse('GET', '/user/profile', response.status, data, duration);
+
+        // Cache the user profile
+        if (data.success && data.data?.user) {
+            await cache.setUserProfile(data.data.user);
+        }
+
+        return data;
+    } catch (error) {
+        logError('GET', '/user/profile', error);
+        throw error;
+    }
+},
 
     /**
      * Update user profile (sync with backend)
@@ -931,35 +982,35 @@ export const authApi = {
         }
     },
 
-    /**
-     * Delete user account permanently
-     * DELETE /api/user/account
-     */
-    deleteAccount: async (): Promise<{ success: boolean; message?: string }> => {
-        if (USE_MOCK_DATA) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            logMock('authApi.deleteAccount()', { success: true });
-            return { success: true, message: 'Account deleted' };
-        }
+        /**
+         * Delete user account permanently
+         * DELETE /api/user/account
+         */
+        deleteAccount: async (): Promise<{ success: boolean; message?: string }> => {
+            if (USE_MOCK_DATA) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                logMock('authApi.deleteAccount()', { success: true });
+                return { success: true, message: 'Account deleted' };
+            }
 
-        try {
-            logRequest('DELETE', '/user/account', undefined);
-            const startTime = Date.now();
+            try {
+                logRequest('DELETE', '/user/account', undefined);
+                const startTime = Date.now();
 
-            const response = await authFetch('/user/account', {
-                method: 'DELETE',
-            });
+                const response = await authFetch('/user/account', {
+                    method: 'DELETE',
+                });
 
-            const data = await response.json();
-            const duration = Date.now() - startTime;
-            logResponse('DELETE', '/user/account', response.status, data, duration);
+                const data = await response.json();
+                const duration = Date.now() - startTime;
+                logResponse('DELETE', '/user/account', response.status, data, duration);
 
-            return data;
-        } catch (error) {
-            logError('DELETE', '/user/account', error);
-            return { success: false, message: 'Failed to delete account' };
-        }
-    },
+                return data;
+            } catch (error) {
+                logError('DELETE', '/user/account', error);
+                return { success: false, message: 'Failed to delete account' };
+            }
+        },
 };
 
 // ==========================================
@@ -1058,14 +1109,14 @@ export const swipeApi = {
             });
 
             const data = await response.json();
-            
+
             // Invalidate profiles cache after swipe
             await cache.invalidateProfiles();
             if (data.data?.isMatch) {
                 // Invalidate matches cache if there's a match
                 await cache.invalidateMatches();
             }
-            
+
             return data;
         } catch (error) {
             console.error('Swipe error:', error);
