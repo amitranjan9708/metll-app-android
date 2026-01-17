@@ -34,6 +34,7 @@ import { EditPhotosScreen } from '../screens/EditPhotosScreen';
 import { EditProfilePictureScreen } from '../screens/EditProfilePictureScreen';
 import { EditPersonalityScreen } from '../screens/EditPersonalityScreen';
 import { DiscoverOnboardingScreen } from '../screens/DiscoverOnboardingScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -333,6 +334,15 @@ export const AppNavigator = () => {
             <Stack.Screen
               name="EditPersonality"
               component={EditPersonalityScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
+            <Stack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: true,

@@ -1150,10 +1150,10 @@ export const swipeApi = {
             if (filters?.ageMax !== undefined) queryParams.append('ageMax', filters.ageMax.toString());
             if (filters?.distanceMax !== undefined) queryParams.append('distanceMax', filters.distanceMax.toString());
             if (filters?.genderPreference) queryParams.append('genderPreference', filters.genderPreference);
-            
+
             const queryString = queryParams.toString();
             const url = queryString ? `/swipe/profiles?${queryString}` : '/swipe/profiles';
-            
+
             const response = await authFetch(url);
             const data = await response.json();
 
@@ -2299,6 +2299,128 @@ export const verificationApi = {
         } catch (error: any) {
             console.error('Liveness verification error:', error);
             throw error;
+        }
+    },
+};
+
+// ==========================================
+// Notification API
+// ==========================================
+
+export interface Notification {
+    id: number;
+    userId: number;
+    type: string;
+    title: string;
+    body: string;
+    data?: Record<string, any>;
+    imageUrl?: string;
+    priority: string;
+    isRead: boolean;
+    isSent: boolean;
+    createdAt: string;
+}
+
+export interface NotificationsResponse {
+    notifications: Notification[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
+export const notificationApi = {
+    /**
+     * Register FCM push token with backend
+     */
+    registerToken: async (
+        token: string,
+        platform: 'android' | 'ios' | 'web',
+        deviceId?: string
+    ): Promise<{ success: boolean; message?: string }> => {
+        try {
+            const response = await authFetch('/notifications/register', {
+                method: 'POST',
+                body: JSON.stringify({ token, platform, deviceId }),
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Register token error:', error);
+            return { success: false, message: 'Failed to register token' };
+        }
+    },
+
+    /**
+     * Unregister FCM token (on logout)
+     */
+    unregisterToken: async (token: string): Promise<{ success: boolean; message?: string }> => {
+        try {
+            const response = await authFetch('/notifications/unregister', {
+                method: 'DELETE',
+                body: JSON.stringify({ token }),
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Unregister token error:', error);
+            return { success: false, message: 'Failed to unregister token' };
+        }
+    },
+
+    /**
+     * Get notifications (paginated)
+     */
+    getNotifications: async (page: number = 1, limit: number = 20): Promise<{ success: boolean; data?: NotificationsResponse }> => {
+        try {
+            const response = await authFetch(`/notifications?page=${page}&limit=${limit}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Get notifications error:', error);
+            return { success: false };
+        }
+    },
+
+    /**
+     * Get unread notification count
+     */
+    getUnreadCount: async (): Promise<{ success: boolean; data?: { count: number } }> => {
+        try {
+            const response = await authFetch('/notifications/unread-count');
+            return await response.json();
+        } catch (error) {
+            console.error('Get unread count error:', error);
+            return { success: false };
+        }
+    },
+
+    /**
+     * Mark a notification as read
+     */
+    markAsRead: async (notificationId: number): Promise<{ success: boolean }> => {
+        try {
+            const response = await authFetch(`/notifications/${notificationId}/read`, {
+                method: 'PUT',
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Mark as read error:', error);
+            return { success: false };
+        }
+    },
+
+    /**
+     * Mark all notifications as read
+     */
+    markAllAsRead: async (): Promise<{ success: boolean }> => {
+        try {
+            const response = await authFetch('/notifications/read-all', {
+                method: 'PUT',
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Mark all as read error:', error);
+            return { success: false };
         }
     },
 };
