@@ -201,7 +201,7 @@ export const EditProfileScreen: React.FC = () => {
         {/* Avatar Section with Completion */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
-            <TouchableOpacity onPress={() => navigation.navigate('PhotoUpload')}>
+            <TouchableOpacity onPress={() => navigation.navigate('EditProfilePicture')}>
               {profileData?.photo ? (
                 <Image source={{ uri: profileData.photo }} style={styles.avatar} />
               ) : (
@@ -235,7 +235,7 @@ export const EditProfileScreen: React.FC = () => {
                 <Ionicons name="images" size={20} color={theme.colors.primary} />
                 <Text style={styles.cardTitle}>Photos ({photos.length})</Text>
               </View>
-              <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('PhotoUpload')}>
+              <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditPhotos')}>
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             </View>

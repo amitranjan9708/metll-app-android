@@ -13,3 +13,5 @@ export { DateScreen } from './DateScreen';
 export { DatesScreen } from './DatesScreen';
 export { CallScreen } from './CallScreen';
 export { PrivacySecurityScreen } from './PrivacySecurityScreen';
+export { EditPhotosScreen } from './EditPhotosScreen';
+export { EditProfilePictureScreen } from './EditProfilePictureScreen';

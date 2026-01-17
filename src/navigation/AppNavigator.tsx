@@ -30,6 +30,8 @@ import { CallScreen } from '../screens/CallScreen';
 import { ReferralScreen } from '../screens/ReferralScreen';
 import { PrivacySecurityScreen } from '../screens/PrivacySecurityScreen';
 import { DatesScreen } from '../screens/DatesScreen';
+import { EditPhotosScreen } from '../screens/EditPhotosScreen';
+import { EditProfilePictureScreen } from '../screens/EditProfilePictureScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -294,6 +296,24 @@ export const AppNavigator = () => {
             <Stack.Screen
               name="PrivacySecurity"
               component={PrivacySecurityScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
+            <Stack.Screen
+              name="EditPhotos"
+              component={EditPhotosScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
+            <Stack.Screen
+              name="EditProfilePicture"
+              component={EditProfilePictureScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: true,
