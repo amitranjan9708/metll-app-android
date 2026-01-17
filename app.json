@@ -31,8 +31,7 @@
         "android.permission.RECORD_AUDIO"
       ]
     },
-    "web": {
-    },
+    "web": {},
     "plugins": [
       [
         "expo-image-picker",
@@ -56,8 +55,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "e7fbd92f-1b9e-44da-bebd-0744b0f32acf"
+        "projectId": "c58caaf0-bd17-4cea-af18-413a43e21054"
       }
-    }
+    },
+    "owner": "dash1930"
   }
 }
