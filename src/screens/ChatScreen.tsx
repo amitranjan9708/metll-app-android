@@ -10,9 +10,7 @@ import {
     Platform,
     ActivityIndicator,
     Image,
-    SafeAreaView,
-    Modal,
-    TouchableWithoutFeedback
+    SafeAreaView
 } from 'react-native';
 import { useTheme } from '../theme/useTheme';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -49,7 +47,6 @@ export const ChatScreen: React.FC = () => {
     const [showOptIn, setShowOptIn] = useState(false);
     const [waitingForOptIn, setWaitingForOptIn] = useState(false);
     const [otherUserId, setOtherUserId] = useState<number>(0);
-    const [showCallModal, setShowCallModal] = useState(false);
 
     // Voice Notes & GIF state
     const [isRecording, setIsRecording] = useState(false);
@@ -726,7 +723,12 @@ export const ChatScreen: React.FC = () => {
 
                 <TouchableOpacity
                     style={styles.callButton}
-                    onPress={() => setShowCallModal(true)}
+                    onPress={() => (navigation as any).navigate('Call', {
+                        matchId,
+                        userName,
+                        userPhoto,
+                        callType: 'voice'
+                    })}
                 >
                     <Ionicons name="call" size={22} color={theme.colors.primary} />
                 </TouchableOpacity>
@@ -759,66 +761,6 @@ export const ChatScreen: React.FC = () => {
                 options={menuOptions}
                 anchorPosition={Platform.OS === 'ios' ? { top: 100, right: 20 } : { top: 60, right: 10 }}
             />
-
-            <Modal
-                visible={showCallModal}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowCallModal(false)}
-            >
-                <TouchableWithoutFeedback onPress={() => setShowCallModal(false)}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={styles.callModalContent}>
-                                <Text style={styles.callModalTitle}>Start Call</Text>
-
-                                <TouchableOpacity
-                                    style={styles.callOptionButton}
-                                    onPress={() => {
-                                        setShowCallModal(false);
-                                        (navigation as any).navigate('Call', {
-                                            matchId,
-                                            userName,
-                                            userPhoto,
-                                            callType: 'voice'
-                                        });
-                                    }}
-                                >
-                                    <View style={[styles.callIconContainer, { backgroundColor: 'rgba(52, 199, 89, 0.1)' }]}>
-                                        <Ionicons name="call" size={24} color="#34C759" />
-                                    </View>
-                                    <Text style={styles.callOptionText}>Voice Call</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.callOptionButton}
-                                    onPress={() => {
-                                        setShowCallModal(false);
-                                        (navigation as any).navigate('Call', {
-                                            matchId,
-                                            userName,
-                                            userPhoto,
-                                            callType: 'video'
-                                        });
-                                    }}
-                                >
-                                    <View style={[styles.callIconContainer, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
-                                        <Ionicons name="videocam" size={24} color="#007AFF" />
-                                    </View>
-                                    <Text style={styles.callOptionText}>Video Call</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.cancelCallButton}
-                                    onPress={() => setShowCallModal(false)}
-                                >
-                                    <Text style={styles.cancelCallText}>Cancel</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
 
             <ReportModal
                 visible={showReportModal}
@@ -1215,57 +1157,5 @@ const getStyles = (theme: any) => StyleSheet.create({
         color: theme.colors.primary,
         fontWeight: '600',
         textAlign: 'center',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    callModalContent: {
-        backgroundColor: theme.colors.backgroundCard,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 24,
-        paddingBottom: 40,
-        gap: 16,
-    },
-    callModalTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: theme.colors.textPrimary,
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    callOptionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: theme.colors.background,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-    },
-    callIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    callOptionText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: theme.colors.textPrimary,
-    },
-    cancelCallButton: {
-        padding: 16,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    cancelCallText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: theme.colors.textSecondary,
     },
 });
