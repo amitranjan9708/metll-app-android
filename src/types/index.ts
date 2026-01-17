@@ -25,6 +25,7 @@ export interface User {
   rewardsEarned?: number;
   rewardsUsed?: number;
 
+  isFaceVerified?: boolean;
   createdAt: string;
 }
 

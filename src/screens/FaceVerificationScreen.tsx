@@ -19,6 +19,7 @@ import { VideoRecorder } from '../components/VideoRecorder';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
+import { verificationApi } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 
 type VerificationStep = 'photo' | 'video' | 'success';
@@ -40,9 +41,34 @@ export const FaceVerificationScreen: React.FC = () => {
   const [step, setStep] = useState<VerificationStep>('photo');
   const [photo, setPhoto] = useState<string>('');
   const [videoUri, setVideoUri] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<string>('pending');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    checkStatus();
+  }, []);
+
+  const checkStatus = async () => {
+    try {
+      const status = await verificationApi.getStatus();
+      setVerificationStatus(status.verificationStatus);
+
+      if (status.isVerified) {
+        setStep('success');
+      } else if (status.verificationStatus === 'photo_uploaded' || status.verificationStatus === 'liveness_pending') {
+        if (status.profilePhoto) setPhoto(status.profilePhoto);
+        setStep('video');
+      } else {
+        setStep('photo');
+      }
+    } catch (error) {
+      console.error('Failed to check status:', error);
+    }
+  };
 
   const animateTransition = (direction: 'forward' | 'back') => {
     Animated.sequence([
@@ -113,9 +139,8 @@ export const FaceVerificationScreen: React.FC = () => {
       Alert.alert('Error', 'Invalid image. Please try again.');
       return;
     }
-
-    // Set the photo - verification will be done in backend later
     setPhoto(uri);
+    setErrorMessage(null);
   };
 
   const showImageOptions = () => {
@@ -130,34 +155,75 @@ export const FaceVerificationScreen: React.FC = () => {
     );
   };
 
-  const handlePhotoNext = () => {
+  const handlePhotoNext = async () => {
     if (!photo) {
       Alert.alert('Required', 'Please upload your profile photo first.');
       return;
     }
-    animateTransition('forward');
-    setTimeout(() => setStep('video'), 150);
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const result = await verificationApi.uploadPhoto(photo);
+      // Photo uploaded successfully, move to video step
+      animateTransition('forward');
+      setTimeout(() => setStep('video'), 150);
+    } catch (error: any) {
+      console.error('Photo upload failed:', error);
+      Alert.alert('Verification Failed', error.message || 'Failed to detect a face. Please try a different photo.');
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVideoRecorded = async (uri: string) => {
-    // Set the video - verification will be done in backend later
     setVideoUri(uri);
-    animateTransition('forward');
-    setTimeout(() => {
-      setStep('success');
-      handleComplete();
-    }, 150);
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const result = await verificationApi.verifyLiveness(uri);
+
+      // Verification successful
+      animateTransition('forward');
+      setTimeout(() => {
+        setStep('success');
+        handleComplete(result);
+      }, 150);
+    } catch (error: any) {
+      console.error('Liveness verification failed:', error);
+      Alert.alert(
+        'Verification Failed',
+        error.message || 'Liveness check failed. Please ensure your face is clearly visible and try again.',
+        [
+          {
+            text: 'Try Again', onPress: () => {
+              // Reset video step
+              setVideoUri('');
+            }
+          }
+        ]
+      );
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (result?: any) => {
     try {
-      await updateUser({
-        photo,
-        isFaceVerified: true,
-      });
+      // Update local user context with new verification status
+      if (user) {
+        await updateUser({
+          ...user,
+          isFaceVerified: true,
+          photo: photo || user.photo,
+        });
+      }
     } catch (error) {
-      console.error('Error updating user:', error);
-      Alert.alert('Error', 'Failed to save verification. Please try again.');
+      console.error('Error updating user context:', error);
     }
   };
 
@@ -281,7 +347,7 @@ export const FaceVerificationScreen: React.FC = () => {
 
   const renderStepIndicator = () => {
     const currentStepIndex = STEPS.indexOf(step);
-    
+
     return (
       <View style={styles.stepIndicator}>
         {STEPS.map((s, index) => {

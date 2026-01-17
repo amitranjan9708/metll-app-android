@@ -2052,7 +2052,6 @@ export const mediaApi = {
             previewUrl: string;
             width: number;
             height: number;
-            originalUrl?: string;
         }>;
         pagination: { offset: number; count: number; total_count: number };
     }> => {
@@ -2078,6 +2077,8 @@ export const mediaApi = {
             throw error;
         }
     },
+
+
 
     /**
      * Send GIF message
@@ -2124,6 +2125,164 @@ export const mediaApi = {
             return data.data;
         } catch (error) {
             logError('POST', '/media/gif/send', error);
+            throw error;
+        }
+    },
+};
+
+// ==========================================
+// Verification API
+// ==========================================
+
+export const verificationApi = {
+    /**
+     * Get verification status
+     */
+    getStatus: async (): Promise<{
+        profilePhoto: string | null;
+        isVerified: boolean;
+        verificationStatus: 'pending' | 'photo_uploaded' | 'liveness_pending' | 'verified' | 'failed';
+        verificationScore: number | null;
+        verificationDate: string | null;
+        nextStep: string | null;
+        progress: number;
+    }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return {
+                profilePhoto: null,
+                isVerified: false,
+                verificationStatus: 'pending',
+                verificationScore: null,
+                verificationDate: null,
+                nextStep: 'photo',
+                progress: 0,
+            };
+        }
+
+        try {
+            const response = await authFetch('/verification/status');
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to get verification status');
+            }
+
+            return data.data;
+        } catch (error) {
+            console.error('Get verification status error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Upload verification photo
+     */
+    uploadPhoto: async (photoUri: string): Promise<{
+        profilePhoto: string;
+        verificationStatus: string;
+        qualityScore: number;
+        nextStep: string;
+    }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return {
+                profilePhoto: photoUri,
+                verificationStatus: 'photo_uploaded',
+                qualityScore: 95,
+                nextStep: 'liveness',
+            };
+        }
+
+        try {
+            const formData = new FormData();
+            const filename = photoUri.split('/').pop() || 'photo.jpg';
+            const match = /\.(\w+)$/.exec(filename);
+            const ext = match ? match[1] : 'jpg';
+
+            // @ts-ignore
+            formData.append('photo', {
+                uri: photoUri,
+                name: filename,
+                type: `image/${ext}`,
+            });
+
+            const token = await getAuthToken();
+            const response = await fetch(`${API_BASE_URL}/verification/photo`, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to upload photo');
+            }
+
+            return data.data;
+        } catch (error) {
+            console.error('Upload verification photo error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Verify liveness with video
+     */
+    verifyLiveness: async (videoUri: string): Promise<{
+        isVerified: boolean;
+        verificationStatus: string;
+        verificationScore: number;
+        verificationDate: string;
+        videoUrl?: string;
+    }> => {
+        if (USE_MOCK_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return {
+                isVerified: true,
+                verificationStatus: 'verified',
+                verificationScore: 98,
+                verificationDate: new Date().toISOString(),
+                videoUrl: videoUri,
+            };
+        }
+
+        try {
+            const formData = new FormData();
+            const filename = videoUri.split('/').pop() || 'video.mp4';
+
+            // @ts-ignore
+            formData.append('video', {
+                uri: videoUri,
+                name: filename,
+                type: 'video/mp4',
+            });
+
+            const token = await getAuthToken();
+            const response = await fetch(`${API_BASE_URL}/verification/liveness`, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                // Return data even if success is false (for failed verification details)
+                if (data.data) {
+                    throw new Error(data.message || 'Verification failed');
+                }
+                throw new Error(data.message || 'Failed to verify liveness');
+            }
+
+            return data.data;
+        } catch (error: any) {
+            console.error('Liveness verification error:', error);
             throw error;
         }
     },
