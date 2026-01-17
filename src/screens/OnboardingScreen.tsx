@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   Animated,
+  BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,9 +52,9 @@ const LogoutButton: React.FC<{ onLogout: () => void; theme: ReturnType<typeof us
     }}
   >
     <Ionicons name="log-out-outline" size={18} color={theme.colors.textSecondary} />
-    <Text style={{ 
-      marginLeft: 6, 
-      color: theme.colors.textSecondary, 
+    <Text style={{
+      marginLeft: 6,
+      color: theme.colors.textSecondary,
       fontSize: 14,
       fontWeight: '500',
     }}>
@@ -83,6 +84,24 @@ export const OnboardingScreen: React.FC = () => {
   const { user, updateUser, logout } = useAuth();
   const [step, setStep] = useState<OnboardingStep>('photo');
   const [photo, setPhoto] = useState('');
+
+  // Handle Android hardware back button
+  React.useEffect(() => {
+    const backAction = () => {
+      if (step !== 'photo') {
+        handleBack();
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [step]);
 
   const [hasSchool, setHasSchool] = useState(false);
   const [schoolName, setSchoolName] = useState('');
@@ -423,7 +442,13 @@ export const OnboardingScreen: React.FC = () => {
               {renderStep()}
               <View style={styles.buttonContainer}>
                 {step !== 'photo' && (
-                  <Button title="Back" onPress={handleBack} variant="outline" style={styles.backButton} />
+                  <Button
+                    title="Back"
+                    onPress={handleBack}
+                    variant="outline"
+                    style={styles.backButton}
+                    contentStyle={{ paddingHorizontal: 0 }}
+                  />
                 )}
                 <Button title={step === 'home' ? 'Complete' : 'Next'} onPress={handleNext} style={styles.nextButton} />
               </View>

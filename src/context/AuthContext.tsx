@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '../types';
+import { User, SchoolDetails, CollegeDetails, OfficeDetails, LocationDetails, SituationResponse } from '../types';
 import { authApi, userApi, setOnUnauthorizedCallback } from '../services/api';
 import { cache } from '../services/cache';
 
@@ -10,7 +10,13 @@ interface AuthContextType {
   isLoading: boolean;
   login: (user: User) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (user: Partial<User>, skipBackendSync?: boolean) => Promise<void>;
+  updateUser: (user: Partial<User> & {
+    school?: SchoolDetails;
+    college?: CollegeDetails;
+    office?: OfficeDetails;
+    homeLocation?: LocationDetails;
+    situationResponses?: SituationResponse[];
+  }, skipBackendSync?: boolean) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   completeDiscoverOnboarding: () => Promise<void>;
 }
@@ -223,7 +229,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const updateUser = useCallback(async (userData: Partial<User>, skipBackendSync: boolean = false) => {
+  const updateUser = useCallback(async (userData: Partial<User> & {
+    school?: SchoolDetails;
+    college?: CollegeDetails;
+    office?: OfficeDetails;
+    homeLocation?: LocationDetails;
+    situationResponses?: SituationResponse[];
+  }, skipBackendSync: boolean = false) => {
     setUser(currentUser => {
       if (!currentUser) return null;
       const updatedUser = { ...currentUser, ...userData };

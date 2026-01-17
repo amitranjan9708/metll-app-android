@@ -23,6 +23,7 @@ interface ButtonProps {
   textStyle?: TextStyle;
   icon?: React.ReactNode;
   fullWidth?: boolean;
+  contentStyle?: ViewStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -35,6 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   icon,
   fullWidth = true,
+  contentStyle,
 }) => {
   const theme = useTheme();
   const styles = getStyles(theme);
@@ -107,7 +109,7 @@ export const Button: React.FC<ButtonProps> = ({
             colors={theme.gradients.primary.colors as [string, string]}
             start={theme.gradients.primary.start}
             end={theme.gradients.primary.end}
-            style={[styles.button, styles.primaryButton, disabled && styles.disabled]}
+            style={[styles.button, styles.primaryButton, disabled && styles.disabled, contentStyle]}
           >
             {renderButtonContent()}
           </LinearGradient>
@@ -136,7 +138,7 @@ export const Button: React.FC<ButtonProps> = ({
             colors={theme.gradients.romantic.colors as [string, string]}
             start={theme.gradients.romantic.start}
             end={theme.gradients.romantic.end}
-            style={[styles.button, styles.romanticButton, disabled && styles.disabled]}
+            style={[styles.button, styles.romanticButton, disabled && styles.disabled, contentStyle]}
           >
             {renderButtonContent()}
           </LinearGradient>
@@ -161,7 +163,7 @@ export const Button: React.FC<ButtonProps> = ({
           activeOpacity={1}
           style={styles.touchable}
         >
-          <View style={[styles.button, styles.secondaryButton, disabled && styles.disabled]}>
+          <View style={[styles.button, styles.secondaryButton, disabled && styles.disabled, contentStyle]}>
             {renderButtonContent()}
           </View>
         </TouchableOpacity>
@@ -177,7 +179,7 @@ export const Button: React.FC<ButtonProps> = ({
       style,
     ]}>
       <TouchableOpacity
-        style={[styles.button, styles.outlineButton, disabled && styles.disabled]}
+        style={[styles.button, styles.outlineButton, disabled && styles.disabled, styles.touchable, contentStyle]}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
