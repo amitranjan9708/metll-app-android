@@ -19,3 +19,7 @@ web-build/
 *.log
 *.tmp
 
+google-service.json
+
+
+GoogleService-Info.plist
