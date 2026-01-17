@@ -271,4 +271,8 @@ export const cache = {
     clearAll: async (): Promise<void> => {
         return cacheService.clearAll();
     },
+    // Generic remove
+    remove: async (key: string): Promise<void> => {
+        return cacheService.remove(key);
+    },
 };
