@@ -159,11 +159,6 @@ export const DiscoverOnboardingScreen: React.FC = () => {
         }
     };
 
-    const handleSkip = () => {
-        // Allow skipping with defaults
-        handleComplete();
-    };
-
     const handleClose = () => {
         // Go back to Home screen instead of Date
         // User can onboard later by going to Date tab
@@ -526,13 +521,7 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                     ))}
                 </View>
 
-                {currentStep !== 'complete' && currentStep !== 'intro' ? (
-                    <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-                        <Text style={styles.skipText}>Skip</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <View style={styles.skipButton} />
-                )}
+                <View style={styles.skipButton} />
             </View>
 
             {/* Content */}
@@ -609,11 +598,6 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             height: 44,
             justifyContent: 'center',
             alignItems: 'center',
-        },
-        skipText: {
-            color: 'rgba(255,255,255,0.8)',
-            fontSize: 14,
-            fontWeight: '500',
         },
         progressContainer: {
             flexDirection: 'row',

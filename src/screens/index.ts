@@ -16,3 +16,4 @@ export { CallScreen } from './CallScreen';
 export { PrivacySecurityScreen } from './PrivacySecurityScreen';
 export { EditPhotosScreen } from './EditPhotosScreen';
 export { EditProfilePictureScreen } from './EditProfilePictureScreen';
+export { EditPersonalityScreen } from './EditPersonalityScreen';

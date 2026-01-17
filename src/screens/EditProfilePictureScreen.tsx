@@ -41,12 +41,30 @@ export const EditProfilePictureScreen: React.FC = () => {
 
   const loadCurrentPhoto = async () => {
     try {
+      // First, try to use existing user photo from context as fallback
+      if (user?.photo) {
+        setCurrentPhoto(user.photo);
+      }
+      
+      // Then fetch fresh data from API
       const response = await userApi.getUserProfile();
+      console.log('📷 EditProfilePicture - Loading current photo:', {
+        success: response.success,
+        hasUser: !!response.data?.user,
+        photo: response.data?.user?.photo,
+        userContextPhoto: user?.photo,
+      });
       if (response.success && response.data?.user) {
-        setCurrentPhoto(response.data.user.profilePhoto || response.data.user.photo || null);
+        const photoUrl = response.data.user.photo || user?.photo || null;
+        console.log('📷 Setting current photo to:', photoUrl);
+        setCurrentPhoto(photoUrl);
       }
     } catch (error) {
       console.error('Failed to load current photo:', error);
+      // Fallback to user context photo on error
+      if (user?.photo) {
+        setCurrentPhoto(user.photo);
+      }
     }
   };
 

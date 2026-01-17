@@ -27,26 +27,26 @@ let RtcSurfaceView: any = null;
 let isAgoraAvailable = false;
 // Only load Agora on native platforms, not on web
 if (Platform.OS !== 'web') {
-    try {
-        const agoraModule = require('react-native-agora');
-        createAgoraRtcEngine = agoraModule.default || agoraModule.createAgoraRtcEngine;
-        IRtcEngine = agoraModule.IRtcEngine;
-        ChannelProfileType = agoraModule.ChannelProfileType;
-        ClientRoleType = agoraModule.ClientRoleType;
-        RtcSurfaceView = agoraModule.RtcSurfaceView;
-        
-        if (createAgoraRtcEngine && ChannelProfileType && ClientRoleType) {
-            isAgoraAvailable = true;
-            console.log('✅ Agora SDK loaded successfully');
-        } else {
-            console.warn('⚠️ Agora SDK partially loaded - some exports missing');
-        }
-    } catch (e) {
-        console.error('❌ Agora SDK not available:', e);
-        console.error('❌ Error details:', e instanceof Error ? e.message : String(e));
-        // Create placeholder components
-        RtcSurfaceView = ({ style, canvas }: any) => null;
-        isAgoraAvailable = false;
+try {
+    const agoraModule = require('react-native-agora');
+    createAgoraRtcEngine = agoraModule.default || agoraModule.createAgoraRtcEngine;
+    IRtcEngine = agoraModule.IRtcEngine;
+    ChannelProfileType = agoraModule.ChannelProfileType;
+    ClientRoleType = agoraModule.ClientRoleType;
+    RtcSurfaceView = agoraModule.RtcSurfaceView;
+    
+    if (createAgoraRtcEngine && ChannelProfileType && ClientRoleType) {
+        isAgoraAvailable = true;
+        console.log('✅ Agora SDK loaded successfully');
+    } else {
+        console.warn('⚠️ Agora SDK partially loaded - some exports missing');
+    }
+} catch (e) {
+    console.error('❌ Agora SDK not available:', e);
+    console.error('❌ Error details:', e instanceof Error ? e.message : String(e));
+    // Create placeholder components
+    RtcSurfaceView = ({ style, canvas }: any) => null;
+    isAgoraAvailable = false;
     }
 } else {
     // Web platform - create placeholder

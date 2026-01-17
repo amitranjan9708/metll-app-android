@@ -335,6 +335,10 @@ export const DateScreen: React.FC = () => {
 
                         return (
                             <View key={`prompt-${idx}`} style={styles.promptCard}>
+                                <View style={styles.promptHeader}>
+                                    <Text style={styles.promptEmoji}>{question.emoji}</Text>
+                                    <Text style={styles.promptCategory}>{question.category}</Text>
+                                </View>
                                 <Text style={styles.promptQuestion}>{question.question}</Text>
                                 <Text style={styles.promptAnswer}>{element.data.answer}</Text>
                                 <TouchableOpacity
@@ -622,15 +626,30 @@ const getStyles = (theme: any, insets: any) => StyleSheet.create({
         padding: 24,
         marginBottom: 12,
         position: 'relative',
-        minHeight: 160,
+        minHeight: 180,
+    },
+    promptHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        gap: 8,
+    },
+    promptEmoji: {
+        fontSize: 20,
+    },
+    promptCategory: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.5)',
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
     },
     promptQuestion: {
         fontSize: 13,
         fontWeight: '500',
         color: 'rgba(255,255,255,0.6)',
         marginBottom: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
+        letterSpacing: 0.3,
     },
     promptAnswer: {
         fontSize: 22,

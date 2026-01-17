@@ -32,6 +32,7 @@ import { PrivacySecurityScreen } from '../screens/PrivacySecurityScreen';
 import { DatesScreen } from '../screens/DatesScreen';
 import { EditPhotosScreen } from '../screens/EditPhotosScreen';
 import { EditProfilePictureScreen } from '../screens/EditProfilePictureScreen';
+import { EditPersonalityScreen } from '../screens/EditPersonalityScreen';
 import { DiscoverOnboardingScreen } from '../screens/DiscoverOnboardingScreen';
 
 const Stack = createStackNavigator();
@@ -323,6 +324,15 @@ export const AppNavigator = () => {
             <Stack.Screen
               name="EditProfilePicture"
               component={EditProfilePictureScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                ...TransitionPresets.SlideFromRightIOS,
+              }}
+            />
+            <Stack.Screen
+              name="EditPersonality"
+              component={EditPersonalityScreen}
               options={{
                 headerShown: false,
                 gestureEnabled: true,

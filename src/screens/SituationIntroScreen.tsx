@@ -113,14 +113,14 @@ export const SituationIntroScreen: React.FC = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            // Save empty responses locally
-                            await updateUser({ 
-                                situationResponses: [] 
-                            });
-                            
-                            // Mark onboarding as complete - sets local isOnboarded flag
-                            await completeOnboarding();
-                            
+                        // Save empty responses locally
+                        await updateUser({ 
+                            situationResponses: [] 
+                        });
+                        
+                        // Mark onboarding as complete - sets local isOnboarded flag
+                        await completeOnboarding();
+                        
                             // Explicitly navigate to Main screen after a short delay to ensure state updates
                             // Use global navigationRef since we're switching stacks
                             setTimeout(() => {

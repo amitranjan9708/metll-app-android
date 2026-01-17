@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { authApi, userApi } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SITUATIONS } from './SituationSelectionScreen';
 
 const PROFILE_CACHE_KEY = '@user_profile_cache';
 
@@ -59,24 +60,36 @@ export const EditProfileScreen: React.FC = () => {
     try {
       if (!refreshing) setLoading(true);
 
-      // Try cache first
+      // Always fetch fresh data first to ensure we have the latest photo
+      const response = await userApi.getUserProfile();
+      if (response.success && response.data?.user) {
+        const data = response.data.user;
+        console.log('📷 Profile data received:', {
+          hasPhoto: !!data.photo,
+          photo: data.photo,
+          hasAdditionalPhotos: data.additionalPhotos?.length > 0,
+        });
+        setProfileData(data);
+        populateForm(data);
+        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
+      } else {
+        // Fallback to cache only if API fails
+        const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+        if (cached) {
+          const data = JSON.parse(cached);
+          setProfileData(data);
+          populateForm(data);
+        }
+      }
+    } catch (error) {
+      console.error('Load profile error:', error);
+      // Try cache on error
       const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
       if (cached) {
         const data = JSON.parse(cached);
         setProfileData(data);
         populateForm(data);
       }
-
-      // Fetch fresh data
-      const response = await userApi.getUserProfile();
-      if (response.success && response.data?.user) {
-        const data = response.data.user;
-        setProfileData(data);
-        populateForm(data);
-        await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
-      }
-    } catch (error) {
-      console.error('Load profile error:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -205,8 +218,8 @@ export const EditProfileScreen: React.FC = () => {
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
             <TouchableOpacity onPress={() => navigation.navigate('EditProfilePicture')}>
-              {profileData?.photo ? (
-                <Image source={{ uri: profileData.photo }} style={styles.avatar} />
+              {(profileData?.photo || user?.photo) ? (
+                <Image source={{ uri: profileData?.photo || user?.photo }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <Ionicons name="person" size={48} color={theme.colors.textMuted} />
@@ -255,6 +268,52 @@ export const EditProfileScreen: React.FC = () => {
               >
                 <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
                 <Text style={styles.addPhotoBtnText}>Add Photos</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Personality Questions Card - Only show if discover onboarded */}
+        {isDiscoverOnboarded && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardTitleRow}>
+                <Ionicons name="chatbubbles" size={20} color={theme.colors.primary} />
+                <Text style={styles.cardTitle}>Personality Questions</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.editBtn} 
+                onPress={() => navigation.navigate('EditPersonality')}
+              >
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {profileData?.situationResponses && profileData.situationResponses.length > 0 ? (
+              profileData.situationResponses.slice(0, 3).map((response: any, index: number) => {
+                const question = SITUATIONS.find(q => q.id === response.questionId);
+                return (
+                  <View key={index} style={styles.personalityItem}>
+                    <View style={styles.personalityHeader}>
+                      <Text style={styles.personalityEmoji}>{question?.emoji || '💬'}</Text>
+                      <Text style={styles.personalityCategory}>{question?.category || 'Question'}</Text>
+                    </View>
+                    <Text style={styles.personalityQuestion} numberOfLines={2}>
+                      {question?.question || 'Question not found'}
+                    </Text>
+                    <Text style={styles.personalityAnswer} numberOfLines={2}>
+                      "{response.answer}"
+                    </Text>
+                  </View>
+                );
+              })
+            ) : (
+              <TouchableOpacity 
+                style={styles.addPhotoBtn} 
+                onPress={() => navigation.navigate('EditPersonality')}
+              >
+                <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
+                <Text style={styles.addPhotoBtnText}>Add Personality Questions</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -741,6 +800,37 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  personalityItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  personalityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  personalityEmoji: {
+    fontSize: 18,
+  },
+  personalityCategory: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  personalityQuestion: {
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  personalityAnswer: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
   statusBadge: {
     flexDirection: 'row',
