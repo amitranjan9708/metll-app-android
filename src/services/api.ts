@@ -646,6 +646,11 @@ export const authApi = {
                 onUnauthorizedCallback();
             }
 
+            // Invalidate cache after successful upload so fresh data is fetched
+            if (data.success) {
+                await cache.remove('cache:user_profile');
+            }
+
             return data;
         } catch (error) {
             logError('POST', '/user/profile-picture', error);
@@ -931,8 +936,12 @@ export const userApi = {
     updateProfile: async (profileData: {
         name?: string;
         bio?: string;
-        age?: number;
+        age?: number | null;
         gender?: string;
+        height?: number | null;
+        latitude?: number | null;
+        longitude?: number | null;
+        currentCity?: string;
         photo?: string;
         additionalPhotos?: string[];
         verificationVideo?: string;
@@ -1113,27 +1122,39 @@ export const swipeApi = {
         distanceMax?: number;
         genderPreference?: string;
     }): Promise<Profile[]> => {
-        // Check cache first
-        const cachedWithAge = await cache.getProfilesWithAge();
-        if (cachedWithAge && cachedWithAge.data.length > 0) {
-            console.log('📦 Using cached profiles');
-            // Only refresh in background if cache is getting stale (more than 50% of expiry time)
-            const PROFILES_CACHE_EXPIRY = 60 * 1000; // 1 minute
-            const STALE_THRESHOLD = PROFILES_CACHE_EXPIRY * 0.5; // 50% = 30 seconds
-            if (cachedWithAge.age > STALE_THRESHOLD) {
-                console.log('🔄 Profiles cache is getting stale, refreshing in background...');
-                authFetch('/swipe/profiles')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success && data.data) {
-                            cache.setProfiles(data.data);
-                        }
-                    })
-                    .catch(err => console.error('Background profile fetch error:', err));
-            } else {
-                console.log('✅ Profiles cache is fresh, skipping background refresh');
+        // Check if filters are applied - if so, skip cache and fetch fresh data
+        const hasFilters = filters && (
+            filters.ageMin !== undefined ||
+            filters.ageMax !== undefined ||
+            filters.distanceMax !== undefined ||
+            (filters.genderPreference && filters.genderPreference !== 'all')
+        );
+
+        // Only use cache if no filters are applied
+        if (!hasFilters) {
+            const cachedWithAge = await cache.getProfilesWithAge();
+            if (cachedWithAge && cachedWithAge.data.length > 0) {
+                console.log('📦 Using cached profiles (no filters)');
+                // Only refresh in background if cache is getting stale (more than 50% of expiry time)
+                const PROFILES_CACHE_EXPIRY = 60 * 1000; // 1 minute
+                const STALE_THRESHOLD = PROFILES_CACHE_EXPIRY * 0.5; // 50% = 30 seconds
+                if (cachedWithAge.age > STALE_THRESHOLD) {
+                    console.log('🔄 Profiles cache is getting stale, refreshing in background...');
+                    authFetch('/swipe/profiles')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.data) {
+                                cache.setProfiles(data.data);
+                            }
+                        })
+                        .catch(err => console.error('Background profile fetch error:', err));
+                } else {
+                    console.log('✅ Profiles cache is fresh, skipping background refresh');
+                }
+                return cachedWithAge.data;
             }
-            return cachedWithAge.data;
+        } else {
+            console.log('🔍 Filters applied, skipping cache:', filters);
         }
 
         if (USE_MOCK_DATA) {
@@ -1149,10 +1170,14 @@ export const swipeApi = {
             if (filters?.ageMin !== undefined) queryParams.append('ageMin', filters.ageMin.toString());
             if (filters?.ageMax !== undefined) queryParams.append('ageMax', filters.ageMax.toString());
             if (filters?.distanceMax !== undefined) queryParams.append('distanceMax', filters.distanceMax.toString());
-            if (filters?.genderPreference) queryParams.append('genderPreference', filters.genderPreference);
+            if (filters?.genderPreference && filters.genderPreference !== 'all') {
+                queryParams.append('genderPreference', filters.genderPreference);
+            }
 
             const queryString = queryParams.toString();
             const url = queryString ? `/swipe/profiles?${queryString}` : '/swipe/profiles';
+            
+            console.log('🌐 Fetching profiles with URL:', url);
 
             const response = await authFetch(url);
             const data = await response.json();
@@ -1161,9 +1186,12 @@ export const swipeApi = {
                 throw new Error(data.message || 'Failed to get profiles');
             }
 
-            // Cache the profiles
-            await cache.setProfiles(data.data);
+            // Only cache unfiltered results
+            if (!hasFilters) {
+                await cache.setProfiles(data.data);
+            }
 
+            console.log(`✅ Fetched ${data.data?.length || 0} profiles with filters`);
             return data.data;
         } catch (error) {
             console.error('Get profiles error:', error);

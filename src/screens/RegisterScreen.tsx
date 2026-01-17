@@ -139,6 +139,7 @@ export const RegisterScreen: React.FC = () => {
         homeLocation: backendUser.homeLocation,
         situationResponses: backendUser.situationResponses,
         isOnboarded: hasCompletedOnboarding, // Set based on backend data
+        isDiscoverOnboarded: !!backendUser.isDiscoverOnboarded, // Persist discover onboarding status
         createdAt: backendUser.createdAt || new Date().toISOString(),
       };
 

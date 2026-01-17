@@ -20,6 +20,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { swipeApi, userApi } from '../services/api';
 import { Profile, MatchData, SituationResponse } from '../types';
 import { MatchModal } from '../components/MatchModal';
+import { LocationPickerModal } from '../components/LocationPickerModal';
 import { useAuth } from '../context/AuthContext';
 import { SITUATIONS } from './SituationSelectionScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,25 +48,48 @@ export const DateScreen: React.FC = () => {
     });
     const [tempFilters, setTempFilters] = useState(filters);
 
+    // Location State for "My Neighborhood"
+    const [userLocation, setUserLocation] = useState<{
+        latitude: number | null;
+        longitude: number | null;
+        city: string | null;
+    }>({ latitude: null, longitude: null, city: null });
+    const [locationLoading, setLocationLoading] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
+
     // Match Modal State
     const [isMatchModalVisible, setIsMatchModalVisible] = useState(false);
     const [currentMatch, setCurrentMatch] = useState<MatchData | null>(null);
 
-    // Load user's dating preferences as default filters
+    // Load user's dating preferences and location as default filters
     useEffect(() => {
         const loadUserPreferences = async () => {
             try {
                 const response = await userApi.getUserProfile();
-                if (response.success && response.data?.user?.datingPrefs) {
-                    const prefs = response.data.user.datingPrefs;
-                    const newFilters = {
-                        ageMin: prefs.ageMin || 18,
-                        ageMax: prefs.ageMax || 35,
-                        distanceMax: prefs.distanceMax || 50,
-                        genderPreference: prefs.genderPreference?.[0] || 'all',
-                    };
-                    setFilters(newFilters);
-                    setTempFilters(newFilters);
+                if (response.success && response.data?.user) {
+                    const userData = response.data.user;
+                    
+                    // Load dating preferences
+                    if (userData.datingPrefs) {
+                        const prefs = userData.datingPrefs;
+                        const newFilters = {
+                            ageMin: prefs.ageMin || 18,
+                            ageMax: prefs.ageMax || 35,
+                            distanceMax: prefs.distanceMax || 50,
+                            genderPreference: prefs.genderPreference?.[0] || 'all',
+                        };
+                        setFilters(newFilters);
+                        setTempFilters(newFilters);
+                    }
+                    
+                    // Load user's location
+                    if (userData.latitude && userData.longitude) {
+                        setUserLocation({
+                            latitude: userData.latitude,
+                            longitude: userData.longitude,
+                            city: userData.currentCity || null,
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load user preferences:', error);
@@ -126,6 +150,43 @@ export const DateScreen: React.FC = () => {
         }
     };
 
+    // Handle location selection from the Location Picker Modal
+    const handleLocationSelect = async (location: {
+        latitude: number;
+        longitude: number;
+        city: string | null;
+    }) => {
+        try {
+            setLocationLoading(true);
+            
+            // Update local state
+            setUserLocation(location);
+
+            // Save to backend
+            const result = await userApi.updateProfile({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                currentCity: location.city || undefined,
+            });
+
+            if (result.success) {
+                Alert.alert(
+                    '📍 Location Updated',
+                    location.city 
+                        ? `Your location is set to ${location.city}. Distance filters will now work!`
+                        : 'Your location has been saved. Distance filters will now work!'
+                );
+            } else {
+                console.warn('Failed to save location to backend');
+            }
+        } catch (error) {
+            console.error('Error saving location:', error);
+            Alert.alert('Error', 'Failed to save your location. Please try again.');
+        } finally {
+            setLocationLoading(false);
+        }
+    };
+
     const handleLike = async (likedElement?: string) => {
         const currentProfile = profiles[currentIndex];
         if (!currentProfile) return;
@@ -142,8 +203,8 @@ export const DateScreen: React.FC = () => {
 
             if (isMatch && match) {
                 setCurrentMatch(match as MatchData);
-                setIsMatchModalVisible(true);
-            }
+                        setIsMatchModalVisible(true);
+                    }
             moveToNextProfile();
         } catch (error) {
             console.error('Like failed:', error);
@@ -207,19 +268,338 @@ export const DateScreen: React.FC = () => {
         );
     }
 
+    // Check if filters are non-default
+    const hasActiveFilters = filters.ageMin !== 18 || 
+                             filters.ageMax !== 50 || 
+                             filters.distanceMax !== 50 || 
+                             filters.genderPreference !== 'all';
+
+    const handleResetFilters = () => {
+        const defaultFilters = {
+            ageMin: 18,
+            ageMax: 50,
+            distanceMax: 50,
+            genderPreference: 'all' as const,
+        };
+        setFilters(defaultFilters);
+        setTempFilters(defaultFilters);
+        // Refetch profiles with reset filters
+        setTimeout(() => handleRefresh(), 100);
+    };
+
+    // Helper function to render the filter modal content
+    const renderFilterModalContent = () => (
+        <View style={styles.filterModal}>
+            <View style={styles.filterModalHeader}>
+                <Text style={styles.filterModalTitle}>Filters</Text>
+                <TouchableOpacity onPress={() => setShowFilters(false)}>
+                    <Ionicons name="close" size={28} color="#1A1A1A" />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.filterModalContent}>
+                {/* Age Range */}
+                <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Age Range</Text>
+                    <View style={styles.ageRangeContainer}>
+                        <View style={styles.ageInputContainer}>
+                            <Text style={styles.ageInputLabel}>Min</Text>
+                            <TextInput
+                                style={styles.ageInput}
+                                value={tempFilters.ageMin.toString()}
+                                onChangeText={(text) => {
+                                    const val = parseInt(text) || 18;
+                                    if (val >= 18 && val <= 100 && val <= tempFilters.ageMax) {
+                                        setTempFilters({ ...tempFilters, ageMin: val });
+                                    }
+                                }}
+                                keyboardType="numeric"
+                                maxLength={3}
+                            />
+                        </View>
+                        <Text style={styles.ageRangeSeparator}>-</Text>
+                        <View style={styles.ageInputContainer}>
+                            <Text style={styles.ageInputLabel}>Max</Text>
+                            <TextInput
+                                style={styles.ageInput}
+                                value={tempFilters.ageMax.toString()}
+                                onChangeText={(text) => {
+                                    const val = parseInt(text) || 35;
+                                    if (val >= 18 && val <= 100 && val >= tempFilters.ageMin) {
+                                        setTempFilters({ ...tempFilters, ageMax: val });
+                                    }
+                                }}
+                                keyboardType="numeric"
+                                maxLength={3}
+                            />
+                        </View>
+                    </View>
+                    <View style={styles.ageQuickButtons}>
+                        {[
+                            { min: 18, max: 25 },
+                            { min: 26, max: 35 },
+                            { min: 36, max: 45 },
+                            { min: 46, max: 100 },
+                        ].map((range, idx) => (
+                            <TouchableOpacity
+                                key={idx}
+                                style={[
+                                    styles.ageQuickBtn,
+                                    tempFilters.ageMin === range.min && tempFilters.ageMax === range.max && styles.ageQuickBtnActive
+                                ]}
+                                onPress={() => setTempFilters({ ...tempFilters, ageMin: range.min, ageMax: range.max })}
+                            >
+                                <Text style={[
+                                    styles.ageQuickBtnText,
+                                    tempFilters.ageMin === range.min && tempFilters.ageMax === range.max && styles.ageQuickBtnTextActive
+                                ]}>
+                                    {range.min}-{range.max}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {/* My Neighborhood - Location */}
+                <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>📍 My Neighborhood</Text>
+                    <Text style={styles.filterSubLabel}>
+                        Set your location to see distance to matches
+                    </Text>
+                    
+                    {userLocation.latitude && userLocation.longitude ? (
+                        <View style={styles.locationStatus}>
+                            <View style={styles.locationStatusContent}>
+                                <Ionicons name="location" size={20} color="#10B981" />
+                                <View>
+                                    <Text style={styles.locationStatusText}>
+                                        {userLocation.city || 'Location set'}
+                                    </Text>
+                                    <Text style={styles.locationCoordsText}>
+                                        {userLocation.latitude.toFixed(2)}°, {userLocation.longitude.toFixed(2)}°
+                                    </Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.updateLocationBtn}
+                                onPress={() => setShowLocationPicker(true)}
+                                disabled={locationLoading}
+                            >
+                                {locationLoading ? (
+                                    <ActivityIndicator size="small" color="#1A1A1A" />
+                                ) : (
+                                    <Text style={styles.updateLocationBtnText}>Change</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <TouchableOpacity
+                            style={styles.getLocationBtn}
+                            onPress={() => setShowLocationPicker(true)}
+                            disabled={locationLoading}
+                        >
+                            {locationLoading ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <>
+                                    <Ionicons name="map" size={20} color="#fff" />
+                                    <Text style={styles.getLocationBtnText}>
+                                        Set My Neighborhood
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    )}
+                    
+                    {!userLocation.latitude && (
+                        <Text style={styles.locationWarning}>
+                            ⚠️ Distance filter won't work without your location
+                        </Text>
+                    )}
+                </View>
+
+                {/* Distance */}
+                <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Maximum Distance (km)</Text>
+                    <View style={styles.distanceInputContainer}>
+                        <TextInput
+                            style={styles.distanceInput}
+                            value={tempFilters.distanceMax.toString()}
+                            onChangeText={(text) => {
+                                const val = parseInt(text) || 50;
+                                if (val >= 1 && val <= 500) {
+                                    setTempFilters({ ...tempFilters, distanceMax: val });
+                                }
+                            }}
+                            keyboardType="numeric"
+                            maxLength={3}
+                        />
+                        <Text style={styles.distanceUnit}>km</Text>
+                    </View>
+                    <View style={styles.distanceQuickButtons}>
+                        {[10, 25, 50, 100, 200].map((dist) => (
+                            <TouchableOpacity
+                                key={dist}
+                                style={[
+                                    styles.distanceQuickBtn,
+                                    tempFilters.distanceMax === dist && styles.distanceQuickBtnActive
+                                ]}
+                                onPress={() => setTempFilters({ ...tempFilters, distanceMax: dist })}
+                            >
+                                <Text style={[
+                                    styles.distanceQuickBtnText,
+                                    tempFilters.distanceMax === dist && styles.distanceQuickBtnTextActive
+                                ]}>
+                                    {dist} km
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {/* Gender */}
+                <View style={styles.filterSection}>
+                    <Text style={styles.filterLabel}>Show Me</Text>
+                    <View style={styles.genderOptions}>
+                        {[
+                            { value: 'all', label: 'Everyone' },
+                            { value: 'male', label: 'Men' },
+                            { value: 'female', label: 'Women' },
+                            { value: 'non-binary', label: 'Non-Binary' },
+                        ].map((g) => (
+                            <TouchableOpacity
+                                key={g.value}
+                                style={[
+                                    styles.genderOption,
+                                    tempFilters.genderPreference === g.value && styles.genderOptionActive
+                                ]}
+                                onPress={() => setTempFilters({ ...tempFilters, genderPreference: g.value })}
+                            >
+                                <Text style={[
+                                    styles.genderOptionText,
+                                    tempFilters.genderPreference === g.value && styles.genderOptionTextActive
+                                ]}>
+                                    {g.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </ScrollView>
+
+            <View style={styles.filterModalFooter}>
+                <TouchableOpacity
+                    style={styles.resetFilterBtn}
+                    onPress={() => {
+                        const defaultFilters = {
+                            ageMin: 18,
+                            ageMax: 50,
+                            distanceMax: 50,
+                            genderPreference: 'all',
+                        };
+                        setTempFilters(defaultFilters);
+                    }}
+                >
+                    <Text style={styles.resetFilterBtnText}>Reset</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.applyFilterBtn}
+                    onPress={async () => {
+                        setFilters(tempFilters);
+                        setShowFilters(false);
+                        // Reload profiles with new filters
+                        setLoading(true);
+                        try {
+                            const data = await swipeApi.getProfiles(tempFilters);
+                            setProfiles(data);
+                            setCurrentIndex(0);
+                        } catch (error) {
+                            console.error('Failed to load filtered profiles:', error);
+                            Alert.alert('Error', 'Failed to apply filters. Please try again.');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }}
+                >
+                    <Text style={styles.applyFilterBtnText}>Apply Filters</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     if (currentIndex >= profiles.length || !currentProfile) {
         return (
             <View style={styles.container}>
+                {/* Header with Filters - same as profile page */}
+                <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                    <Text style={styles.headerTitle}>Discover</Text>
+                    <View style={styles.filterRow}>
+                        <TouchableOpacity
+                            style={[styles.filterChip, hasActiveFilters && styles.filterChipActive]}
+                            onPress={() => {
+                                setTempFilters(filters);
+                                setShowFilters(true);
+                            }}
+                        >
+                            <Ionicons name="options-outline" size={16} color={hasActiveFilters ? "#fff" : "#1A1A1A"} />
+                            <Text style={[styles.filterChipText, hasActiveFilters && styles.filterChipTextActive]}>Filters</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.filterChip} onPress={() => setShowFilters(true)}>
+                            <Text style={styles.filterChipText}>{filters.ageMin}-{filters.ageMax} yrs</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.filterChip} onPress={() => setShowFilters(true)}>
+                            <Text style={styles.filterChipText}>{filters.distanceMax} km</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 <View style={styles.emptyContainer}>
                     <View style={styles.emptyIcon}>
                         <Ionicons name="search" size={48} color={theme.colors.textMuted} />
                     </View>
-                    <Text style={styles.emptyTitle}>No more profiles</Text>
-                    <Text style={styles.emptySubtitle}>Check back later for new people near you</Text>
+                    <Text style={styles.emptyTitle}>No profiles found</Text>
+                    <Text style={styles.emptySubtitle}>
+                        {hasActiveFilters 
+                            ? "Try adjusting your filters to see more people" 
+                            : "Check back later for new people near you"}
+                    </Text>
+                    
+                    {hasActiveFilters && (
+                        <TouchableOpacity style={styles.resetFiltersBtn} onPress={handleResetFilters}>
+                            <Ionicons name="refresh-outline" size={18} color="#fff" />
+                            <Text style={styles.resetFiltersBtnText}>Reset Filters</Text>
+                        </TouchableOpacity>
+                    )}
+                    
                     <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
                         <Text style={styles.refreshBtnText}>Refresh</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Filter Modal - needed for adjusting filters from empty state */}
+                <Modal
+                    visible={showFilters}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                    onRequestClose={() => {
+                        setTempFilters(filters);
+                        setShowFilters(false);
+                    }}
+                >
+                    {renderFilterModalContent()}
+                </Modal>
+
+                {/* Location Picker Modal */}
+                <LocationPickerModal
+                    visible={showLocationPicker}
+                    onClose={() => setShowLocationPicker(false)}
+                    onLocationSelect={handleLocationSelect}
+                    initialLocation={userLocation ? {
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                        city: userLocation.city
+                    } : undefined}
+                />
             </View>
         );
     }
@@ -282,7 +662,7 @@ export const DateScreen: React.FC = () => {
                     <TouchableOpacity style={styles.filterChip} onPress={() => setShowFilters(true)}>
                         <Text style={styles.filterChipText}>{filters.distanceMax} km</Text>
                     </TouchableOpacity>
-                </View>
+                                </View>
             </View>
 
             <ScrollView
@@ -301,7 +681,7 @@ export const DateScreen: React.FC = () => {
                     if (element.type === 'photo') {
                         return (
                             <View key={`photo-${idx}`} style={styles.photoCard}>
-                                <Image
+                            <Image
                                     source={{ uri: element.url }}
                                     style={styles.profilePhoto}
                                     resizeMode="cover"
@@ -317,7 +697,7 @@ export const DateScreen: React.FC = () => {
                     }
 
                     if (element.type === 'info') {
-                        return (
+    return (
                             <View key="info" style={styles.infoCard}>
                                 <View style={styles.nameRow}>
                                     <Text style={styles.profileName}>{currentProfile.name}</Text>
@@ -329,7 +709,7 @@ export const DateScreen: React.FC = () => {
                                             <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                                         </View>
                                     )}
-                                </View>
+            </View>
 
                                 {currentProfile.bio && (
                                     <Text style={styles.profileBio}>{currentProfile.bio}</Text>
@@ -371,12 +751,12 @@ export const DateScreen: React.FC = () => {
                                 </View>
                                 <Text style={styles.promptQuestion}>{question.question}</Text>
                                 <Text style={styles.promptAnswer}>{element.data.answer}</Text>
-                                <TouchableOpacity
+                    <TouchableOpacity
                                     style={styles.promptLikeBtn}
                                     onPress={() => handleLike(`prompt-${element.index}`)}
-                                >
+                    >
                                     <Ionicons name="heart-outline" size={22} color="#1A1A1A" />
-                                </TouchableOpacity>
+                    </TouchableOpacity>
                             </View>
                         );
                     }
@@ -392,12 +772,12 @@ export const DateScreen: React.FC = () => {
             <View style={styles.actionContainer}>
                 <TouchableOpacity style={styles.passBtn} onPress={handlePass}>
                     <Ionicons name="close" size={28} color="#1A1A1A" />
-                </TouchableOpacity>
+                    </TouchableOpacity>
 
                 <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike()}>
                     <Ionicons name="heart" size={28} color="#fff" />
-                </TouchableOpacity>
-            </View>
+                    </TouchableOpacity>
+                </View>
 
             <MatchModal
                 visible={isMatchModalVisible}
@@ -407,194 +787,25 @@ export const DateScreen: React.FC = () => {
                 onKeepSwiping={() => setIsMatchModalVisible(false)}
             />
 
+            {/* Location Picker Modal */}
+            <LocationPickerModal
+                visible={showLocationPicker}
+                onClose={() => setShowLocationPicker(false)}
+                onLocationSelect={handleLocationSelect}
+                initialLocation={userLocation}
+            />
+
             {/* Filter Modal */}
             <Modal
                 visible={showFilters}
                 animationType="slide"
                 presentationStyle="pageSheet"
                 onRequestClose={() => {
-                    setTempFilters(filters); // Reset temp filters on close
+                    setTempFilters(filters);
                     setShowFilters(false);
                 }}
             >
-                <View style={styles.filterModal}>
-                    <View style={styles.filterModalHeader}>
-                        <Text style={styles.filterModalTitle}>Filters</Text>
-                        <TouchableOpacity onPress={() => setShowFilters(false)}>
-                            <Ionicons name="close" size={28} color="#1A1A1A" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView style={styles.filterModalContent}>
-                        {/* Age Range */}
-                        <View style={styles.filterSection}>
-                            <Text style={styles.filterLabel}>Age Range</Text>
-                            <View style={styles.ageRangeContainer}>
-                                <View style={styles.ageInputContainer}>
-                                    <Text style={styles.ageInputLabel}>Min</Text>
-                                    <TextInput
-                                        style={styles.ageInput}
-                                        value={tempFilters.ageMin.toString()}
-                                        onChangeText={(text) => {
-                                            const val = parseInt(text) || 18;
-                                            if (val >= 18 && val <= 100 && val <= tempFilters.ageMax) {
-                                                setTempFilters({ ...tempFilters, ageMin: val });
-                                            }
-                                        }}
-                                        keyboardType="numeric"
-                                        maxLength={3}
-                                    />
-                                </View>
-                                <Text style={styles.ageRangeSeparator}>-</Text>
-                                <View style={styles.ageInputContainer}>
-                                    <Text style={styles.ageInputLabel}>Max</Text>
-                                    <TextInput
-                                        style={styles.ageInput}
-                                        value={tempFilters.ageMax.toString()}
-                                        onChangeText={(text) => {
-                                            const val = parseInt(text) || 35;
-                                            if (val >= 18 && val <= 100 && val >= tempFilters.ageMin) {
-                                                setTempFilters({ ...tempFilters, ageMax: val });
-                                            }
-                                        }}
-                                        keyboardType="numeric"
-                                        maxLength={3}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.ageQuickButtons}>
-                                {[
-                                    { min: 18, max: 25 },
-                                    { min: 26, max: 35 },
-                                    { min: 36, max: 45 },
-                                    { min: 46, max: 100 },
-                                ].map((range, idx) => (
-                                    <TouchableOpacity
-                                        key={idx}
-                                        style={[
-                                            styles.ageQuickBtn,
-                                            tempFilters.ageMin === range.min && tempFilters.ageMax === range.max && styles.ageQuickBtnActive
-                                        ]}
-                                        onPress={() => setTempFilters({ ...tempFilters, ageMin: range.min, ageMax: range.max })}
-                                    >
-                                        <Text style={[
-                                            styles.ageQuickBtnText,
-                                            tempFilters.ageMin === range.min && tempFilters.ageMax === range.max && styles.ageQuickBtnTextActive
-                                        ]}>
-                                            {range.min}-{range.max}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-
-                        {/* Distance */}
-                        <View style={styles.filterSection}>
-                            <Text style={styles.filterLabel}>Maximum Distance (km)</Text>
-                            <View style={styles.distanceInputContainer}>
-                                <TextInput
-                                    style={styles.distanceInput}
-                                    value={tempFilters.distanceMax.toString()}
-                                    onChangeText={(text) => {
-                                        const val = parseInt(text) || 50;
-                                        if (val >= 1 && val <= 500) {
-                                            setTempFilters({ ...tempFilters, distanceMax: val });
-                                        }
-                                    }}
-                                    keyboardType="numeric"
-                                    maxLength={3}
-                                />
-                                <Text style={styles.distanceUnit}>km</Text>
-                            </View>
-                            <View style={styles.distanceQuickButtons}>
-                                {[10, 25, 50, 100, 200].map((dist) => (
-                                    <TouchableOpacity
-                                        key={dist}
-                                        style={[
-                                            styles.distanceQuickBtn,
-                                            tempFilters.distanceMax === dist && styles.distanceQuickBtnActive
-                                        ]}
-                                        onPress={() => setTempFilters({ ...tempFilters, distanceMax: dist })}
-                                    >
-                                        <Text style={[
-                                            styles.distanceQuickBtnText,
-                                            tempFilters.distanceMax === dist && styles.distanceQuickBtnTextActive
-                                        ]}>
-                                            {dist} km
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-
-                        {/* Gender */}
-                        <View style={styles.filterSection}>
-                            <Text style={styles.filterLabel}>Show Me</Text>
-                            <View style={styles.genderOptions}>
-                                {[
-                                    { value: 'all', label: 'Everyone' },
-                                    { value: 'male', label: 'Men' },
-                                    { value: 'female', label: 'Women' },
-                                    { value: 'non-binary', label: 'Non-Binary' },
-                                ].map((g) => (
-        <TouchableOpacity
-                                        key={g.value}
-            style={[
-                                            styles.genderOption,
-                                            tempFilters.genderPreference === g.value && styles.genderOptionActive
-                                        ]}
-                                        onPress={() => setTempFilters({ ...tempFilters, genderPreference: g.value })}
-                                    >
-                                        <Text style={[
-                                            styles.genderOptionText,
-                                            tempFilters.genderPreference === g.value && styles.genderOptionTextActive
-                                        ]}>
-                                            {g.label}
-            </Text>
-        </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-                    </ScrollView>
-
-                    <View style={styles.filterModalFooter}>
-                        <TouchableOpacity
-                            style={styles.resetFilterBtn}
-                            onPress={() => {
-                                const defaultFilters = {
-                                    ageMin: 18,
-                                    ageMax: 35,
-                                    distanceMax: 50,
-                                    genderPreference: 'all',
-                                };
-                                setTempFilters(defaultFilters);
-                            }}
-                        >
-                            <Text style={styles.resetFilterBtnText}>Reset</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.applyFilterBtn}
-                            onPress={async () => {
-                                setFilters(tempFilters);
-                                setShowFilters(false);
-                                // Reload profiles with new filters
-                                setLoading(true);
-                                try {
-                                    const data = await swipeApi.getProfiles(tempFilters);
-                                    setProfiles(data);
-                                    setCurrentIndex(0);
-                                } catch (error) {
-                                    console.error('Failed to load filtered profiles:', error);
-                                    Alert.alert('Error', 'Failed to apply filters. Please try again.');
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }}
-                        >
-                            <Text style={styles.applyFilterBtnText}>Apply Filters</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                {renderFilterModalContent()}
             </Modal>
         </View>
     );
@@ -653,6 +864,21 @@ const getStyles = (theme: any, insets: any) => StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
+    resetFiltersBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        backgroundColor: theme.colors.primary,
+        borderRadius: 25,
+        marginBottom: 12,
+    },
+    resetFiltersBtnText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '600',
+    },
     // Header
     header: {
         backgroundColor: '#FAFAFA',
@@ -686,6 +912,13 @@ const getStyles = (theme: any, insets: any) => StyleSheet.create({
         fontSize: 14,
         color: '#1A1A1A',
         fontWeight: '500',
+    },
+    filterChipActive: {
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
+    },
+    filterChipTextActive: {
+        color: '#fff',
     },
     scrollView: {
         flex: 1,
@@ -880,6 +1113,72 @@ const getStyles = (theme: any, insets: any) => StyleSheet.create({
         fontWeight: '600',
         color: '#1A1A1A',
         marginBottom: 12,
+    },
+    filterSubLabel: {
+        fontSize: 13,
+        color: '#6B6B6B',
+        marginBottom: 16,
+        marginTop: -8,
+    },
+    // My Neighborhood styles
+    locationStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F0FDF4',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: '#10B981',
+    },
+    locationStatusContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    locationStatusText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#059669',
+    },
+    locationCoordsText: {
+        fontSize: 11,
+        color: '#6B6B6B',
+        marginTop: 2,
+    },
+    updateLocationBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    updateLocationBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#1A1A1A',
+    },
+    getLocationBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        backgroundColor: '#1A1A1A',
+        paddingVertical: 16,
+        borderRadius: 12,
+    },
+    getLocationBtnText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    locationWarning: {
+        fontSize: 13,
+        color: '#D97706',
+        marginTop: 12,
+        textAlign: 'center',
     },
     filterValue: {
         backgroundColor: '#F5F5F5',

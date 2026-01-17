@@ -132,13 +132,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           } else {
             console.log('✅ Session valid');
-            // Merge backend data but PRESERVE local isOnboarded flag
+            // Merge backend data - use backend values if available, fall back to local
             if (validation.user) {
+              const backendUser = validation.user as any;
               const updatedUser = {
                 ...parsedUser,
                 ...validation.user,
-                isOnboarded: parsedUser.isOnboarded, // ALWAYS preserve local onboarding status
-                isDiscoverOnboarded: parsedUser.isDiscoverOnboarded, // Preserve discover onboarding status
+                // Use backend values if true, otherwise preserve local (handles migration)
+                isOnboarded: backendUser.isOnboarded || parsedUser.isOnboarded,
+                isDiscoverOnboarded: backendUser.isDiscoverOnboarded || parsedUser.isDiscoverOnboarded,
               };
               setUser(updatedUser);
               await AsyncStorage.setItem('user', JSON.stringify(updatedUser));

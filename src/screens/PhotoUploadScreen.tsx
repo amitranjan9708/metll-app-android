@@ -62,17 +62,38 @@ export const PhotoUploadScreen: React.FC = () => {
         uploadError: null,
     });
 
+    // Track if we've initiated auto-upload to prevent duplicate uploads
+    const [autoUploadInitiated, setAutoUploadInitiated] = useState(false);
+
     // Pre-fill with existing user profile photo on mount
     useEffect(() => {
         if (user?.photo) {
-            setProfilePhoto({
-                localUri: user.photo,
-                cloudinaryUrl: user.photo,
-                isUploading: false,
-                uploadError: null,
-            });
+            // Check if it's a Cloudinary URL (already uploaded) or local file URI
+            const isCloudinaryUrl = user.photo.includes('cloudinary.com') || user.photo.includes('res.cloudinary');
+            const isHttpUrl = user.photo.startsWith('http://') || user.photo.startsWith('https://');
+            
+            if (isCloudinaryUrl || isHttpUrl) {
+                // Already uploaded to server
+                setProfilePhoto({
+                    localUri: user.photo,
+                    cloudinaryUrl: user.photo,
+                    isUploading: false,
+                    uploadError: null,
+                });
+            } else if (!autoUploadInitiated) {
+                // Local file URI from OnboardingScreen - needs upload
+                console.log('📷 Found local photo from onboarding, will auto-upload...');
+                setProfilePhoto({
+                    localUri: user.photo,
+                    cloudinaryUrl: null,
+                    isUploading: false,
+                    uploadError: null,
+                });
+                // Mark that we'll auto-upload
+                setAutoUploadInitiated(true);
+            }
         }
-    }, [user?.photo]);
+    }, [user?.photo, autoUploadInitiated]);
 
     // Video state
     const [videoUri, setVideoUri] = useState<string | null>(null);
@@ -174,6 +195,14 @@ export const PhotoUploadScreen: React.FC = () => {
             }));
         }
     };
+
+    // Auto-upload photo from onboarding when component mounts with local URI
+    useEffect(() => {
+        if (autoUploadInitiated && profilePhoto.localUri && !profilePhoto.cloudinaryUrl && !profilePhoto.isUploading) {
+            console.log('📷 Auto-uploading photo from onboarding...');
+            uploadProfilePicture(profilePhoto.localUri);
+        }
+    }, [autoUploadInitiated, profilePhoto.localUri, profilePhoto.cloudinaryUrl, profilePhoto.isUploading]);
 
     // Retry profile picture upload
     const retryProfilePicture = () => {
