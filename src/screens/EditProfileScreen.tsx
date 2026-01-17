@@ -175,6 +175,9 @@ export const EditProfileScreen: React.FC = () => {
   if (profileData?.photo) photos.push(profileData.photo);
   if (Array.isArray(profileData?.additionalPhotos)) photos.push(...profileData.additionalPhotos);
 
+  // Check if user has completed discover onboarding to show additional photos edit
+  const isDiscoverOnboarded = profileData?.isDiscoverOnboarded || user?.isDiscoverOnboarded || false;
+
   return (
     <View style={styles.container}>
       {/* Fixed Header */}
@@ -227,23 +230,33 @@ export const EditProfileScreen: React.FC = () => {
           </Text>
         </View>
 
-        {/* Photos Card */}
-        {photos.length > 0 && (
+        {/* Photos Card - Only show if user has completed discover onboarding */}
+        {isDiscoverOnboarded && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardTitleRow}>
                 <Ionicons name="images" size={20} color={theme.colors.primary} />
-                <Text style={styles.cardTitle}>Photos ({photos.length})</Text>
+                <Text style={styles.cardTitle}>Additional Photos ({Math.max(0, photos.length - 1)})</Text>
               </View>
               <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditPhotos')}>
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {photos.map((uri, i) => (
-                <Image key={i} source={{ uri }} style={styles.photoThumb} />
-              ))}
-            </ScrollView>
+            {photos.length > 1 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {photos.filter((_, i) => i > 0).map((uri, i) => (
+                  <Image key={i} source={{ uri }} style={styles.photoThumb} />
+                ))}
+              </ScrollView>
+            ) : (
+              <TouchableOpacity 
+                style={styles.addPhotoBtn} 
+                onPress={() => navigation.navigate('EditPhotos')}
+              >
+                <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
+                <Text style={styles.addPhotoBtnText}>Add Photos</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -716,6 +729,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginRight: 10,
     backgroundColor: theme.colors.border,
+  },
+  addPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  addPhotoBtnText: {
+    color: theme.colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   statusBadge: {
     flexDirection: 'row',

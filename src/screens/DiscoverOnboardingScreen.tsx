@@ -9,21 +9,25 @@ import {
     Animated,
     Dimensions,
     ActivityIndicator,
+    Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
-import { userApi } from '../services/api';
+import { userApi, authApi } from '../services/api';
 import { DatingPreferences } from '../types';
 
 const { width } = Dimensions.get('window');
 
-type DiscoverStep = 'intro' | 'preferences' | 'lifestyle' | 'complete';
+type DiscoverStep = 'intro' | 'photos' | 'preferences' | 'lifestyle' | 'complete';
 
-const STEPS: DiscoverStep[] = ['intro', 'preferences', 'lifestyle', 'complete'];
+const STEPS: DiscoverStep[] = ['intro', 'photos', 'preferences', 'lifestyle', 'complete'];
+
+const MAX_ADDITIONAL_PHOTOS = 5;
 
 // Preference options
 const RELATIONSHIP_TYPES = [
@@ -78,7 +82,11 @@ export const DiscoverOnboardingScreen: React.FC = () => {
 
     const [currentStep, setCurrentStep] = useState<DiscoverStep>('intro');
     const [loading, setLoading] = useState(false);
+    const [uploadingPhotos, setUploadingPhotos] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current;
+
+    // Photos state
+    const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
 
     // Preferences state
     const [preferences, setPreferences] = useState<Partial<DatingPreferences>>({
@@ -177,6 +185,98 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             }
         }
     };
+
+    const handlePickPhoto = async () => {
+        if (additionalPhotos.length >= MAX_ADDITIONAL_PHOTOS) {
+            Alert.alert('Maximum Photos', `You can only add up to ${MAX_ADDITIONAL_PHOTOS} additional photos.`);
+            return;
+        }
+
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
+            return;
+        }
+
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [3, 4],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setAdditionalPhotos(prev => [...prev, result.assets[0].uri]);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to pick image');
+        }
+    };
+
+    const handleRemovePhoto = (index: number) => {
+        setAdditionalPhotos(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleUploadPhotos = async () => {
+        if (additionalPhotos.length === 0) {
+            handleNext();
+            return;
+        }
+
+        try {
+            setUploadingPhotos(true);
+            const result = await authApi.uploadPhotos(additionalPhotos);
+            if (!result.success) {
+                console.warn('Failed to upload photos:', result.message);
+                Alert.alert('Warning', 'Some photos may not have been uploaded. You can add more later.');
+            }
+            handleNext();
+        } catch (error) {
+            console.error('Error uploading photos:', error);
+            Alert.alert('Error', 'Failed to upload photos. You can try again later from your profile.');
+            handleNext();
+        } finally {
+            setUploadingPhotos(false);
+        }
+    };
+
+    const renderPhotosStep = () => (
+        <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionTitle}>Add More Photos</Text>
+            <Text style={styles.sectionSubtitle}>
+                Show off your personality! Add up to {MAX_ADDITIONAL_PHOTOS} additional photos to your profile.
+            </Text>
+
+            <View style={styles.photosGrid}>
+                {additionalPhotos.map((uri, index) => (
+                    <View key={index} style={styles.photoContainer}>
+                        <Image source={{ uri }} style={styles.photoImage} />
+                        <TouchableOpacity
+                            style={styles.removePhotoButton}
+                            onPress={() => handleRemovePhoto(index)}
+                        >
+                            <Ionicons name="close-circle" size={28} color="#ff4444" />
+                        </TouchableOpacity>
+                    </View>
+                ))}
+
+                {additionalPhotos.length < MAX_ADDITIONAL_PHOTOS && (
+                    <TouchableOpacity style={styles.addPhotoButton} onPress={handlePickPhoto}>
+                        <Ionicons name="add" size={40} color="rgba(255,255,255,0.6)" />
+                        <Text style={styles.addPhotoText}>Add Photo</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            <Text style={styles.photoTip}>
+                💡 Tip: Photos showing your hobbies and interests get more matches!
+            </Text>
+
+            <View style={{ height: 100 }} />
+        </ScrollView>
+    );
 
     const renderIntroStep = () => (
         <View style={styles.stepContent}>
@@ -378,6 +478,8 @@ export const DiscoverOnboardingScreen: React.FC = () => {
         switch (currentStep) {
             case 'intro':
                 return renderIntroStep();
+            case 'photos':
+                return renderPhotosStep();
             case 'preferences':
                 return renderPreferencesStep();
             case 'lifestyle':
@@ -452,6 +554,23 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                             <ActivityIndicator color="#fff" />
                         ) : (
                             <Text style={styles.primaryButtonText}>Start Discovering</Text>
+                        )}
+                    </TouchableOpacity>
+                ) : currentStep === 'photos' ? (
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        onPress={handleUploadPhotos}
+                        disabled={uploadingPhotos}
+                    >
+                        {uploadingPhotos ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <>
+                                <Text style={styles.primaryButtonText}>
+                                    {additionalPhotos.length > 0 ? 'Upload & Continue' : 'Skip for Now'}
+                                </Text>
+                                <Ionicons name="arrow-forward" size={20} color="#fff" />
+                            </>
                         )}
                     </TouchableOpacity>
                 ) : (
@@ -586,6 +705,55 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             fontSize: 14,
             color: 'rgba(255,255,255,0.7)',
             marginBottom: 24,
+        },
+        // Photos
+        photosGrid: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 12,
+            marginTop: 8,
+        },
+        photoContainer: {
+            width: (width - 64) / 3,
+            height: (width - 64) / 3 * 1.3,
+            borderRadius: 12,
+            overflow: 'hidden',
+            position: 'relative',
+        },
+        photoImage: {
+            width: '100%',
+            height: '100%',
+            resizeMode: 'cover',
+        },
+        removePhotoButton: {
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            backgroundColor: '#fff',
+            borderRadius: 14,
+        },
+        addPhotoButton: {
+            width: (width - 64) / 3,
+            height: (width - 64) / 3 * 1.3,
+            borderRadius: 12,
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderWidth: 2,
+            borderColor: 'rgba(255,255,255,0.3)',
+            borderStyle: 'dashed',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        addPhotoText: {
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: 12,
+            marginTop: 4,
+        },
+        photoTip: {
+            fontSize: 14,
+            color: 'rgba(255,255,255,0.8)',
+            textAlign: 'center',
+            marginTop: 24,
+            paddingHorizontal: 20,
         },
         optionGroup: {
             marginBottom: 32,
