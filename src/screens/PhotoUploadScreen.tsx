@@ -23,8 +23,7 @@ import { VideoRecorder } from '../components/VideoRecorder';
 import { authApi } from '../services/api';
 
 const { width } = Dimensions.get('window');
-const PHOTO_GAP = 12;
-const PHOTO_SIZE = (width - (24 * 2) - (PHOTO_GAP * 2)) / 3;
+const PHOTO_SIZE = width * 0.6; // Larger single photo size for profile
 
 type ScreenStep = 'photos' | 'video';
 
@@ -55,50 +54,25 @@ export const PhotoUploadScreen: React.FC = () => {
     // Screen step: photos first, then video
     const [screenStep, setScreenStep] = useState<ScreenStep>('photos');
 
-    // 6 photo slots with upload status
-    const [photoSlots, setPhotoSlots] = useState<PhotoSlot[]>(
-        Array(6).fill(null).map(() => ({
-            localUri: null,
-            cloudinaryUrl: null,
-            isUploading: false,
-            uploadError: null,
-        }))
-    );
+    // Single profile photo slot
+    const [profilePhoto, setProfilePhoto] = useState<PhotoSlot>({
+        localUri: null,
+        cloudinaryUrl: null,
+        isUploading: false,
+        uploadError: null,
+    });
 
-    // Pre-fill with existing user photos on mount
+    // Pre-fill with existing user profile photo on mount
     useEffect(() => {
-        if (user) {
-            setPhotoSlots(prev => {
-                const newSlots = [...prev];
-                
-                // Pre-fill profile picture (slot 0) if user already has one
-                if (user.photo) {
-                    newSlots[0] = {
-                        localUri: user.photo, // Use Cloudinary URL as display
-                        cloudinaryUrl: user.photo,
-                        isUploading: false,
-                        uploadError: null,
-                    };
-                }
-                
-                // Pre-fill additional photos (slots 1-5) if user has them
-                if (user.additionalPhotos && user.additionalPhotos.length > 0) {
-                    user.additionalPhotos.forEach((photoUrl, index) => {
-                        if (index < 5) { // Max 5 additional photos (slots 1-5)
-                            newSlots[index + 1] = {
-                                localUri: photoUrl,
-                                cloudinaryUrl: photoUrl,
-                                isUploading: false,
-                                uploadError: null,
-                            };
-                        }
-                    });
-                }
-                
-                return newSlots;
+        if (user?.photo) {
+            setProfilePhoto({
+                localUri: user.photo,
+                cloudinaryUrl: user.photo,
+                isUploading: false,
+                uploadError: null,
             });
         }
-    }, [user?.photo, user?.additionalPhotos]);
+    }, [user?.photo]);
 
     // Video state
     const [videoUri, setVideoUri] = useState<string | null>(null);
@@ -110,34 +84,28 @@ export const PhotoUploadScreen: React.FC = () => {
     const [isUploadingAdditional, setIsUploadingAdditional] = useState(false);
     const [additionalError, setAdditionalError] = useState<string | null>(null);
 
-    // Count photos
-    const uploadedCount = photoSlots.filter(p => p.localUri !== null).length;
-    const profilePhotoUploaded = photoSlots[0].cloudinaryUrl !== null;
-    const isEnough = uploadedCount >= 3;
+    // Check if profile photo is uploaded
+    const profilePhotoUploaded = profilePhoto.cloudinaryUrl !== null;
+    const canProceed = profilePhotoUploaded;
 
-    // Check if all selected photos are uploaded
-    const allPhotosUploaded = photoSlots.every(slot => 
-        slot.localUri === null || slot.cloudinaryUrl !== null
-    );
-
-    const handlePickImage = async (index: number) => {
-        // If this is the first photo slot (index 0) and it's empty, show verification prompt
-        if (index === 0 && photoSlots[0].localUri === null) {
+    const handlePickImage = async () => {
+        // Show verification prompt for profile photo
+        if (!profilePhoto.localUri) {
             Alert.alert(
-                '📸 Verification Photo',
-                'This photo will be used to verify your identity. Please upload a clear, well-lit photo of your face without sunglasses or filters.',
+                '📸 Profile Photo',
+                'This photo will be used as your main profile picture and for identity verification. Please upload a clear, well-lit photo of your face.',
                 [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Got it!', onPress: () => proceedWithImagePick(index) }
+                    { text: 'Got it!', onPress: () => proceedWithImagePick() }
                 ]
             );
             return;
         }
 
-        await proceedWithImagePick(index);
+        await proceedWithImagePick();
     };
 
-    const proceedWithImagePick = async (index: number) => {
+    const proceedWithImagePick = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
@@ -154,21 +122,17 @@ export const PhotoUploadScreen: React.FC = () => {
 
             if (!result.canceled && result.assets[0]) {
                 const imageUri = result.assets[0].uri;
-                
-                // Update slot with local URI
-                const newSlots = [...photoSlots];
-                newSlots[index] = {
+
+                // Update with local URI
+                setProfilePhoto({
                     localUri: imageUri,
                     cloudinaryUrl: null,
                     isUploading: false,
                     uploadError: null,
-                };
-                setPhotoSlots(newSlots);
+                });
 
-                // If this is the profile picture (index 0), upload immediately
-                if (index === 0) {
-                    uploadProfilePicture(imageUri);
-                }
+                // Upload immediately
+                uploadProfilePicture(imageUri);
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to pick image');
@@ -178,11 +142,7 @@ export const PhotoUploadScreen: React.FC = () => {
     // Upload profile picture immediately
     const uploadProfilePicture = async (imageUri: string) => {
         // Set uploading state
-        setPhotoSlots(prev => {
-            const newSlots = [...prev];
-            newSlots[0] = { ...newSlots[0], isUploading: true, uploadError: null };
-            return newSlots;
-        });
+        setProfilePhoto(prev => ({ ...prev, isUploading: true, uploadError: null }));
 
         try {
             console.log('📤 Uploading profile picture...');
@@ -194,99 +154,81 @@ export const PhotoUploadScreen: React.FC = () => {
 
             console.log('✅ Profile picture uploaded:', result.data.photo);
 
-            // Update slot with Cloudinary URL
-            setPhotoSlots(prev => {
-                const newSlots = [...prev];
-                newSlots[0] = {
-                    ...newSlots[0],
-                    cloudinaryUrl: result.data!.photo,
-                    isUploading: false,
-                    uploadError: null,
-                };
-                return newSlots;
-            });
+            // Update with Cloudinary URL
+            setProfilePhoto(prev => ({
+                ...prev,
+                cloudinaryUrl: result.data!.photo,
+                isUploading: false,
+                uploadError: null,
+            }));
 
             // Update local user state
             await updateUser({ photo: result.data.photo }, true);
 
         } catch (error: any) {
             console.error('❌ Profile picture upload failed:', error);
-            setPhotoSlots(prev => {
-                const newSlots = [...prev];
-                newSlots[0] = {
-                    ...newSlots[0],
-                    isUploading: false,
-                    uploadError: error.message || 'Upload failed',
-                };
-                return newSlots;
-            });
+            setProfilePhoto(prev => ({
+                ...prev,
+                isUploading: false,
+                uploadError: error.message || 'Upload failed',
+            }));
         }
     };
 
     // Retry profile picture upload
     const retryProfilePicture = () => {
-        const profileSlot = photoSlots[0];
-        if (profileSlot.localUri) {
-            uploadProfilePicture(profileSlot.localUri);
+        if (profilePhoto.localUri) {
+            uploadProfilePicture(profilePhoto.localUri);
         }
     };
 
-    const handleRemoveImage = async (index: number) => {
-        const slot = photoSlots[index];
-        
+    const handleRemoveImage = async () => {
         // If the photo was uploaded to Cloudinary, delete from backend too
-        if (slot.cloudinaryUrl) {
+        if (profilePhoto.cloudinaryUrl) {
             try {
-                console.log(`🗑️ Deleting photo at index ${index} from backend...`);
-                const result = await authApi.deletePhoto(index);
-                
+                console.log('🗑️ Deleting profile photo from backend...');
+                const result = await authApi.deletePhoto(0);
+
                 if (result.success) {
                     console.log('✅ Photo deleted from backend');
                 } else {
                     console.warn('⚠️ Failed to delete from backend:', result.message);
-                    // Continue with local removal anyway
                 }
             } catch (error) {
                 console.error('❌ Error deleting photo from backend:', error);
-                // Continue with local removal anyway
             }
         }
-        
+
         // Delete local file from device cache
-        if (slot.localUri) {
+        if (profilePhoto.localUri) {
             try {
-                console.log(`🗑️ Deleting local file: ${slot.localUri}`);
-                const fileInfo = await FileSystem.getInfoAsync(slot.localUri);
-                
+                const fileInfo = await FileSystem.getInfoAsync(profilePhoto.localUri);
                 if (fileInfo.exists) {
-                    await FileSystem.deleteAsync(slot.localUri, { idempotent: true });
-                    console.log('✅ Local file deleted');
+                    await FileSystem.deleteAsync(profilePhoto.localUri, { idempotent: true });
                 }
             } catch (error) {
                 console.warn('⚠️ Could not delete local file:', error);
-                // Not critical, continue anyway
             }
         }
-        
+
         // Reset local state
-        const newSlots = [...photoSlots];
-        newSlots[index] = {
+        setProfilePhoto({
             localUri: null,
             cloudinaryUrl: null,
             isUploading: false,
             uploadError: null,
-        };
-        setPhotoSlots(newSlots);
-        
-        // Update local user state if needed
-        if (index === 0) {
-            await updateUser({ photo: undefined }, true);
-        }
+        });
+
+        // Update local user state
+        await updateUser({ photo: undefined }, true);
     };
 
-    // Upload additional photos when clicking "Continue to Video"
+    // Proceed to video step (no additional photos to upload)
     const handlePhotosComplete = async () => {
-        if (!isEnough) return;
+        if (!canProceed) {
+            Alert.alert('Profile Photo Required', 'Please upload your profile photo to continue.');
+            return;
+        }
 
         // Check if profile picture is uploaded
         if (!profilePhotoUploaded) {
@@ -294,62 +236,8 @@ export const PhotoUploadScreen: React.FC = () => {
             return;
         }
 
-        // Get additional photos (index 1-5) that need uploading
-        const additionalPhotos = photoSlots.slice(1).filter(slot => 
-            slot.localUri !== null && slot.cloudinaryUrl === null
-        );
-
-        if (additionalPhotos.length === 0) {
-            // All additional photos already uploaded, proceed to video
-            setScreenStep('video');
-            return;
-        }
-
-        setIsUploadingAdditional(true);
-        setAdditionalError(null);
-
-        try {
-            console.log('📤 Uploading additional photos...');
-            const urisToUpload = additionalPhotos.map(slot => slot.localUri!);
-            
-            const result = await authApi.uploadPhotos(urisToUpload);
-
-            if (!result.success) {
-                throw new Error(result.message || 'Failed to upload additional photos');
-            }
-
-            console.log('✅ Additional photos uploaded:', result.data?.uploadedUrls);
-
-            // Update slots with Cloudinary URLs
-            const uploadedUrls = result.data?.uploadedUrls || [];
-            let urlIndex = 0;
-
-            setPhotoSlots(prev => {
-                const newSlots = [...prev];
-                for (let i = 1; i < newSlots.length; i++) {
-                    if (newSlots[i].localUri !== null && newSlots[i].cloudinaryUrl === null) {
-                        newSlots[i] = {
-                            ...newSlots[i],
-                            cloudinaryUrl: uploadedUrls[urlIndex] || null,
-                        };
-                        urlIndex++;
-                    }
-                }
-                return newSlots;
-            });
-
-            // Update local user state
-            await updateUser({ additionalPhotos: uploadedUrls }, true);
-
-            // Proceed to video step
-            setScreenStep('video');
-
-        } catch (error: any) {
-            console.error('❌ Additional photos upload failed:', error);
-            setAdditionalError(error.message || 'Failed to upload photos');
-        } finally {
-            setIsUploadingAdditional(false);
-        }
+        // Proceed directly to video step
+        setScreenStep('video');
     };
 
     const handleVideoRecorded = async (uri: string) => {
@@ -368,13 +256,12 @@ export const PhotoUploadScreen: React.FC = () => {
             console.log('✅ Video uploaded:', result.data?.video);
             setVideoUrl(result.data?.video || null);
 
-            // Update local user state
-            await updateUser({ verificationVideo: result.data?.video }, true);
+            // Backend already saved the video, just proceed to next step
 
             // Success! Navigate to next step
             Alert.alert(
                 'Success! 🎉',
-                'Your photos and video have been uploaded successfully.',
+                'Your profile photo and video have been uploaded successfully.',
                 [{ text: 'Continue', onPress: () => navigation.navigate('SituationIntro') }]
             );
 
@@ -406,8 +293,8 @@ export const PhotoUploadScreen: React.FC = () => {
                 style={styles.container}
             >
                 <View style={[styles.videoHeader, { paddingTop: insets.top + theme.spacing.md }]}>
-                    <TouchableOpacity 
-                        style={styles.backBtn} 
+                    <TouchableOpacity
+                        style={styles.backBtn}
                         onPress={handleVideoCancel}
                         disabled={isUploadingVideo}
                     >
@@ -473,7 +360,7 @@ export const PhotoUploadScreen: React.FC = () => {
         );
     }
 
-    // Photos Step (default)
+    // Photos Step - Single Profile Photo
     return (
         <LinearGradient
             colors={[theme.colors.background, theme.colors.backgroundLight]}
@@ -490,101 +377,76 @@ export const PhotoUploadScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.header}>
-                    <Text style={styles.title}>Add Your Best Photos</Text>
+                    <Text style={styles.title}>Add Your Profile Photo</Text>
                     <Text style={styles.subtitle}>
-                        Upload at least 3 photos. Your first photo will be uploaded immediately for verification.
+                        This photo will be used as your main profile picture and for identity verification.
                     </Text>
                 </View>
 
-                <View style={styles.grid}>
-                    {photoSlots.map((slot, index) => (
-                        <View key={index} style={styles.photoContainer}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.photoSlot,
-                                    !slot.localUri && styles.photoSlotEmpty,
-                                    index === 0 && styles.photoSlotPrimary,
-                                    { borderColor: index === 0 ? theme.colors.primary : theme.colors.border },
-                                    slot.uploadError && { borderColor: theme.colors.error },
-                                ]}
-                                onPress={() => handlePickImage(index)}
-                                activeOpacity={0.8}
-                                disabled={slot.isUploading}
-                            >
-                                {slot.localUri ? (
-                                    <>
-                                        <Image source={{ uri: slot.localUri }} style={styles.photo} />
-                                        
-                                        {/* Upload status overlay */}
-                                        {slot.isUploading && (
-                                            <View style={styles.photoOverlay}>
-                                                <ActivityIndicator size="small" color="#fff" />
-                                            </View>
-                                        )}
+                {/* Single Profile Photo */}
+                <View style={styles.singlePhotoContainer}>
+                    <TouchableOpacity
+                        style={[
+                            styles.singlePhotoSlot,
+                            !profilePhoto.localUri && styles.photoSlotEmpty,
+                            { borderColor: theme.colors.primary },
+                            profilePhoto.uploadError && { borderColor: theme.colors.error },
+                        ]}
+                        onPress={handlePickImage}
+                        activeOpacity={0.8}
+                        disabled={profilePhoto.isUploading}
+                    >
+                        {profilePhoto.localUri ? (
+                            <>
+                                <Image source={{ uri: profilePhoto.localUri }} style={styles.singlePhoto} />
 
-                                        {/* Uploaded checkmark */}
-                                        {slot.cloudinaryUrl && !slot.isUploading && (
-                                            <View style={styles.uploadedBadge}>
-                                                <Ionicons name="checkmark" size={12} color="#fff" />
-                                            </View>
-                                        )}
-
-                                        {/* Error indicator */}
-                                        {slot.uploadError && !slot.isUploading && (
-                                            <TouchableOpacity 
-                                                style={styles.errorBadge}
-                                                onPress={index === 0 ? retryProfilePicture : undefined}
-                                            >
-                                                <Ionicons name="refresh" size={12} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-
-                                        {/* Remove button */}
-                                        {!slot.isUploading && (
-                                            <TouchableOpacity
-                                                style={styles.removeBtn}
-                                                onPress={() => handleRemoveImage(index)}
-                                            >
-                                                <Ionicons name="close" size={12} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-
-                                        {index === 0 && slot.cloudinaryUrl && (
-                                            <View style={styles.verificationBadge}>
-                                                <Ionicons name="shield-checkmark" size={12} color="#fff" />
-                                            </View>
-                                        )}
-                                    </>
-                                ) : (
-                                    <View style={styles.addIcon}>
-                                        <Ionicons
-                                            name={index === 0 ? "person" : "add"}
-                                            size={24}
-                                            color={theme.colors.primary}
-                                        />
+                                {/* Upload status overlay */}
+                                {profilePhoto.isUploading && (
+                                    <View style={styles.photoOverlay}>
+                                        <ActivityIndicator size="large" color="#fff" />
+                                        <Text style={{ color: '#fff', marginTop: 8 }}>Uploading...</Text>
                                     </View>
                                 )}
-                            </TouchableOpacity>
-                            {index === 0 && !slot.localUri && (
-                                <View style={[styles.requiredBadge, { backgroundColor: theme.colors.primary }]}>
-                                    <Text style={[styles.requiredText, { color: '#fff' }]}>Profile</Text>
-                                </View>
-                            )}
-                            {index > 0 && index < 3 && !slot.localUri && (
-                                <View style={styles.requiredBadge}>
-                                    <Text style={styles.requiredText}>Required</Text>
-                                </View>
-                            )}
-                        </View>
-                    ))}
+
+                                {/* Uploaded checkmark */}
+                                {profilePhoto.cloudinaryUrl && !profilePhoto.isUploading && (
+                                    <View style={[styles.uploadedBadge, { width: 32, height: 32, borderRadius: 16 }]}>
+                                        <Ionicons name="checkmark" size={20} color="#fff" />
+                                    </View>
+                                )}
+
+                                {/* Remove button */}
+                                {!profilePhoto.isUploading && (
+                                    <TouchableOpacity
+                                        style={[styles.removeBtn, { width: 32, height: 32, borderRadius: 16 }]}
+                                        onPress={handleRemoveImage}
+                                    >
+                                        <Ionicons name="close" size={18} color="#fff" />
+                                    </TouchableOpacity>
+                                )}
+
+                                {/* Verification badge */}
+                                {profilePhoto.cloudinaryUrl && (
+                                    <View style={[styles.verificationBadge, { width: 32, height: 32, borderRadius: 16 }]}>
+                                        <Ionicons name="shield-checkmark" size={18} color="#fff" />
+                                    </View>
+                                )}
+                            </>
+                        ) : (
+                            <View style={styles.addPhotoContent}>
+                                <Ionicons name="person-add" size={48} color={theme.colors.primary} />
+                                <Text style={styles.addPhotoText}>Tap to add photo</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* Profile picture error message */}
-                {photoSlots[0].uploadError && (
+                {profilePhoto.uploadError && (
                     <View style={styles.errorBanner}>
                         <Ionicons name="warning" size={20} color={theme.colors.error} />
                         <Text style={styles.errorBannerText}>
-                            Profile picture upload failed: {photoSlots[0].uploadError}
+                            Upload failed: {profilePhoto.uploadError}
                         </Text>
                         <TouchableOpacity onPress={retryProfilePicture}>
                             <Text style={styles.retryLink}>Retry</Text>
@@ -592,37 +454,29 @@ export const PhotoUploadScreen: React.FC = () => {
                     </View>
                 )}
 
-                {/* Additional photos error message */}
-                {additionalError && (
-                    <View style={styles.errorBanner}>
-                        <Ionicons name="warning" size={20} color={theme.colors.error} />
-                        <Text style={styles.errorBannerText}>{additionalError}</Text>
-                    </View>
-                )}
-
                 <View style={styles.tipsContainer}>
                     <Text style={styles.tipsTitle}>Photo Tips 📸</Text>
                     <View style={styles.tipRow}>
                         <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                        <Text style={styles.tipText}>First photo: Clear face, no sunglasses</Text>
+                        <Text style={styles.tipText}>Clear face, no sunglasses or filters</Text>
                     </View>
                     <View style={styles.tipRow}>
                         <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                        <Text style={styles.tipText}>Include a full body shot</Text>
+                        <Text style={styles.tipText}>Good lighting and recent photo</Text>
                     </View>
                     <View style={styles.tipRow}>
                         <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                        <Text style={styles.tipText}>Show your hobbies and personality</Text>
+                        <Text style={styles.tipText}>Just you in the photo, no group pics</Text>
                     </View>
                 </View>
 
                 {/* Status indicator */}
                 <View style={styles.statusContainer}>
                     <View style={styles.statusItem}>
-                        <Ionicons 
-                            name={profilePhotoUploaded ? "checkmark-circle" : "ellipse-outline"} 
-                            size={20} 
-                            color={profilePhotoUploaded ? theme.colors.success : theme.colors.textMuted} 
+                        <Ionicons
+                            name={profilePhotoUploaded ? "checkmark-circle" : "ellipse-outline"}
+                            size={20}
+                            color={profilePhotoUploaded ? theme.colors.success : theme.colors.textMuted}
                         />
                         <Text style={[styles.statusText, profilePhotoUploaded && styles.statusTextDone]}>
                             Profile photo {profilePhotoUploaded ? 'uploaded' : 'pending'}
@@ -631,7 +485,7 @@ export const PhotoUploadScreen: React.FC = () => {
                 </View>
 
                 {/* Next Step Preview */}
-                {isEnough && profilePhotoUploaded && (
+                {profilePhotoUploaded && (
                     <View style={styles.nextStepPreview}>
                         <Ionicons name="videocam" size={20} color={theme.colors.accent} />
                         <Text style={styles.nextStepText}>
@@ -643,14 +497,10 @@ export const PhotoUploadScreen: React.FC = () => {
 
             <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
                 <Button
-                    title={isUploadingAdditional 
-                        ? "Uploading photos..." 
-                        : `Continue to Video (${uploadedCount}/6)`
-                    }
+                    title="Continue to Video"
                     onPress={handlePhotosComplete}
-                    disabled={!isEnough || !profilePhotoUploaded || photoSlots[0].isUploading || isUploadingAdditional}
-                    loading={isUploadingAdditional}
-                    variant={isEnough && profilePhotoUploaded ? 'primary' : 'outline'}
+                    disabled={!profilePhotoUploaded || profilePhoto.isUploading}
+                    variant={profilePhotoUploaded ? 'primary' : 'outline'}
                 />
             </View>
         </LinearGradient>
@@ -702,10 +552,38 @@ const getStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
         color: theme.colors.textSecondary,
         textAlign: 'center',
     },
+    singlePhotoContainer: {
+        alignItems: 'center',
+        marginBottom: theme.spacing.xl,
+    },
+    singlePhotoSlot: {
+        width: PHOTO_SIZE,
+        height: PHOTO_SIZE * 1.33,
+        borderRadius: theme.borderRadius.lg,
+        backgroundColor: theme.colors.backgroundCard,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderStyle: 'solid',
+    },
+    singlePhoto: {
+        width: '100%',
+        height: '100%',
+    },
+    addPhotoContent: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addPhotoText: {
+        ...theme.typography.body,
+        color: theme.colors.textSecondary,
+        marginTop: theme.spacing.sm,
+    },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: PHOTO_GAP,
+        gap: 12,
         marginBottom: theme.spacing.lg,
         justifyContent: 'center',
     },

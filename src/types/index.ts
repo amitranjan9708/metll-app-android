@@ -1,22 +1,121 @@
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone: string;
+
+  // Status flags
+  isVerified?: boolean;
+  isOnboarded?: boolean;       // Phase 1 complete
+  isDiscoverOnboarded?: boolean; // Phase 2 complete
+
+  // Relations (may be populated)
+  profile?: UserProfile;
+  photos?: UserPhoto[];
+  verification?: UserVerification;
+  datingPrefs?: DatingPreferences;
+
+  // Legacy convenience fields (computed from relations)
   photo?: string;
   additionalPhotos?: string[];
-  verificationVideo?: string;
-  school?: SchoolDetails;
-  college?: CollegeDetails;
-  office?: OfficeDetails;
-  homeLocation?: LocationDetails;
-  situationResponses?: SituationResponse[];
-  isOnboarded?: boolean; // Local flag to track onboarding completion
+
+  // Referral
   referralCode?: string;
   totalReferrals?: number;
   rewardsEarned?: number;
   rewardsUsed?: number;
+
   createdAt: string;
+}
+
+// ==========================================
+// Profile & Background Types
+// ==========================================
+
+export interface UserProfile {
+  id: number;
+  userId: number;
+  bio?: string;
+  age?: number;
+  gender?: string;
+  height?: number;
+  latitude?: number;
+  longitude?: number;
+  currentCity?: string;
+  pastCity?: string;
+  school?: UserSchool;
+  college?: UserCollege;
+  office?: UserOffice;
+}
+
+export interface UserSchool {
+  id: number;
+  name: string;
+  city?: string;
+  state?: string;
+  class?: string;
+  section?: string;
+}
+
+export interface UserCollege {
+  id: number;
+  name: string;
+  department?: string;
+  location?: string;
+}
+
+export interface UserOffice {
+  id: number;
+  name: string;
+  designation?: string;
+  department?: string;
+  location?: string;
+}
+
+// ==========================================
+// Photos & Verification Types
+// ==========================================
+
+export interface UserPhoto {
+  id: number;
+  userId: number;
+  url: string;
+  publicId: string;
+  type: 'profile' | 'additional';
+  order: number;
+}
+
+export interface UserVerification {
+  id: number;
+  userId: number;
+  videoUrl?: string;
+  videoPublicId?: string;
+  faceId?: string;
+  status: 'pending' | 'photo_uploaded' | 'verified' | 'failed';
+  score?: number;
+  verifiedAt?: string;
+}
+
+// ==========================================
+// Dating Preferences Types
+// ==========================================
+
+export interface DatingPreferences {
+  id: number;
+  userId: number;
+  relationshipType: 'friends_first' | 'monogamy' | 'non_monogamy' | 'open_to_all' | 'figuring_out';
+  datingIntention: 'casual' | 'serious' | 'marriage' | 'open_to_all';
+  genderPreference: string[];
+  ageMin: number;
+  ageMax: number;
+  distanceMax: number;
+  children?: string;
+  familyPlans?: string;
+  smoking?: string;
+  drinking?: string;
+  drugs?: string;
+  politics?: string;
+  education?: string;
 }
 
 export type SituationCategory = 'Dating' | 'Social' | 'Adventure' | 'Life' | 'Entertainment' | 'Ethics';

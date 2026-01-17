@@ -51,10 +51,17 @@ export const DateScreen: React.FC = () => {
 
     useFocusEffect(
         useCallback(() => {
+            // Discover onboarding is MANDATORY - no bypass allowed
+            // User must complete it to access Date/Discover page
+            if (user && !user.isDiscoverOnboarded) {
+                navigation.navigate('DiscoverOnboarding');
+                return;
+            }
+
             if (profiles.length === 0) {
                 loadProfiles();
             }
-        }, [])
+        }, [user?.isDiscoverOnboarded])
     );
 
     const loadProfiles = async () => {

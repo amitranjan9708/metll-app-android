@@ -32,6 +32,7 @@ import { PrivacySecurityScreen } from '../screens/PrivacySecurityScreen';
 import { DatesScreen } from '../screens/DatesScreen';
 import { EditPhotosScreen } from '../screens/EditPhotosScreen';
 import { EditProfilePictureScreen } from '../screens/EditProfilePictureScreen';
+import { DiscoverOnboardingScreen } from '../screens/DiscoverOnboardingScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -282,6 +283,14 @@ export const AppNavigator = () => {
             <Stack.Screen name="SituationIntro" component={SituationIntroScreen} />
             <Stack.Screen name="SituationSelection" component={SituationSelectionScreen} />
             <Stack.Screen name="SituationAnswer" component={SituationAnswerScreen} />
+            <Stack.Screen
+              name="DiscoverOnboarding"
+              component={DiscoverOnboardingScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
             <Stack.Screen name="Referral" component={ReferralScreen} />
             <Stack.Screen

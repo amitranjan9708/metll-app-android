@@ -12,6 +12,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateUser: (user: Partial<User>, skipBackendSync?: boolean) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  completeDiscoverOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -87,6 +88,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.setItem('user', JSON.stringify(parsedUser));
       }
 
+      // MIGRATION: If user doesn't have isDiscoverOnboarded flag,
+      // default to false (will need to complete discover onboarding)
+      if (parsedUser.isDiscoverOnboarded === undefined) {
+        console.log('📱 User missing isDiscoverOnboarded flag, defaulting to false');
+        parsedUser = { ...parsedUser, isDiscoverOnboarded: false };
+        await AsyncStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+
       // Set user from local storage IMMEDIATELY - LOCAL DATA IS PRIMARY
       setUser(parsedUser);
 
@@ -123,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...parsedUser,
                 ...validation.user,
                 isOnboarded: parsedUser.isOnboarded, // ALWAYS preserve local onboarding status
+                isDiscoverOnboarded: parsedUser.isDiscoverOnboarded, // Preserve discover onboarding status
               };
               setUser(updatedUser);
               await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
@@ -275,6 +285,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  // Mark discover onboarding as complete - sets local flag
+  const completeDiscoverOnboarding = useCallback(async () => {
+    console.log('🎉 Marking discover onboarding as complete');
+    setUser(currentUser => {
+      if (!currentUser) return null;
+      const updatedUser = { ...currentUser, isDiscoverOnboarded: true };
+
+      // Save to AsyncStorage
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser)).catch(err => {
+        console.error('Error saving discover onboarding status:', err);
+      });
+
+      return updatedUser;
+    });
+  }, []);
+
   // Memoize the context value to prevent unnecessary re-renders of consumers
   const contextValue = useMemo(() => ({
     user,
@@ -284,7 +310,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     updateUser,
     completeOnboarding,
-  }), [user, isLoading, login, logout, updateUser, completeOnboarding]);
+    completeDiscoverOnboarding,
+  }), [user, isLoading, login, logout, updateUser, completeOnboarding, completeDiscoverOnboarding]);
 
   return (
     <AuthContext.Provider value={contextValue}>

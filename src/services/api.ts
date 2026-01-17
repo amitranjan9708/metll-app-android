@@ -1010,6 +1010,93 @@ export const userApi = {
             return { success: false, message: 'Failed to delete account' };
         }
     },
+
+    /**
+     * Save dating preferences
+     * POST /api/user/dating-preferences
+     */
+    saveDatingPreferences: async (preferences: {
+        relationshipType?: string;
+        datingIntention?: string;
+        genderPreference?: string[];
+        ageMin?: number;
+        ageMax?: number;
+        distanceMax?: number;
+        children?: string;
+        familyPlans?: string;
+        smoking?: string;
+        drinking?: string;
+        drugs?: string;
+        politics?: string;
+        education?: string;
+    }): Promise<{ success: boolean; message?: string; data?: any }> => {
+        try {
+            logRequest('POST', '/user/dating-preferences', preferences);
+            const startTime = Date.now();
+
+            const response = await authFetch('/user/dating-preferences', {
+                method: 'POST',
+                body: JSON.stringify(preferences),
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/user/dating-preferences', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('POST', '/user/dating-preferences', error);
+            return { success: false, message: 'Failed to save dating preferences' };
+        }
+    },
+
+    /**
+     * Get dating preferences
+     * GET /api/user/dating-preferences
+     */
+    getDatingPreferences: async (): Promise<{ success: boolean; message?: string; data?: any }> => {
+        try {
+            logRequest('GET', '/user/dating-preferences', undefined);
+            const startTime = Date.now();
+
+            const response = await authFetch('/user/dating-preferences', {
+                method: 'GET',
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('GET', '/user/dating-preferences', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('GET', '/user/dating-preferences', error);
+            return { success: false, message: 'Failed to get dating preferences' };
+        }
+    },
+
+    /**
+     * Complete discover onboarding
+     * POST /api/user/complete-discover-onboarding
+     */
+    completeDiscoverOnboarding: async (): Promise<{ success: boolean; message?: string; data?: any }> => {
+        try {
+            logRequest('POST', '/user/complete-discover-onboarding', undefined);
+            const startTime = Date.now();
+
+            const response = await authFetch('/user/complete-discover-onboarding', {
+                method: 'POST',
+            });
+
+            const data = await response.json();
+            const duration = Date.now() - startTime;
+            logResponse('POST', '/user/complete-discover-onboarding', response.status, data, duration);
+
+            return data;
+        } catch (error) {
+            logError('POST', '/user/complete-discover-onboarding', error);
+            return { success: false, message: 'Failed to complete discover onboarding' };
+        }
+    },
 };
 
 // ==========================================

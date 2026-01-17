@@ -2,6 +2,7 @@ export { RegisterScreen } from './RegisterScreen';
 export { OTPScreen } from './OTPScreen';
 export { ForgotPasswordScreen } from './ForgotPasswordScreen';
 export { OnboardingScreen } from './OnboardingScreen';
+export { DiscoverOnboardingScreen } from './DiscoverOnboardingScreen';
 export { HomeScreen } from './HomeScreen';
 export { LiveMatchingScreen } from './LiveMatchingScreen';
 export { SettingsScreen } from './SettingsScreen';
