@@ -15,6 +15,16 @@ export interface User {
   verification?: UserVerification;
   datingPrefs?: DatingPreferences;
 
+  // Flattened profile data (from backend response)
+  school?: UserSchool;
+  college?: UserCollege;
+  office?: UserOffice;
+  homeLocation?: {
+    current?: { city?: string; address?: string; state?: string };
+    past?: { city?: string; address?: string; state?: string };
+  };
+  situationResponses?: SituationResponse[];
+
   // Legacy convenience fields (computed from relations)
   photo?: string;
   additionalPhotos?: string[];

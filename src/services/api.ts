@@ -1107,7 +1107,12 @@ export const swipeApi = {
     /**
      * Get profiles available to swipe on
      */
-    getProfiles: async (): Promise<Profile[]> => {
+    getProfiles: async (filters?: {
+        ageMin?: number;
+        ageMax?: number;
+        distanceMax?: number;
+        genderPreference?: string;
+    }): Promise<Profile[]> => {
         // Check cache first
         const cachedWithAge = await cache.getProfilesWithAge();
         if (cachedWithAge && cachedWithAge.data.length > 0) {
@@ -1139,7 +1144,17 @@ export const swipeApi = {
         }
 
         try {
-            const response = await authFetch('/swipe/profiles');
+            // Build query string from filters
+            const queryParams = new URLSearchParams();
+            if (filters?.ageMin !== undefined) queryParams.append('ageMin', filters.ageMin.toString());
+            if (filters?.ageMax !== undefined) queryParams.append('ageMax', filters.ageMax.toString());
+            if (filters?.distanceMax !== undefined) queryParams.append('distanceMax', filters.distanceMax.toString());
+            if (filters?.genderPreference) queryParams.append('genderPreference', filters.genderPreference);
+            
+            const queryString = queryParams.toString();
+            const url = queryString ? `/swipe/profiles?${queryString}` : '/swipe/profiles';
+            
+            const response = await authFetch(url);
             const data = await response.json();
 
             if (!data.success) {

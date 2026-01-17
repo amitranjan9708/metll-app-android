@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,12 +10,14 @@ import {
     Dimensions,
     ActivityIndicator,
     Image,
+    TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { userApi, authApi } from '../services/api';
@@ -23,9 +25,32 @@ import { DatingPreferences } from '../types';
 
 const { width } = Dimensions.get('window');
 
-type DiscoverStep = 'intro' | 'photos' | 'preferences' | 'lifestyle' | 'complete';
+type DiscoverStep = 'intro' | 'basics' | 'photos' | 'preferences' | 'lifestyle' | 'complete';
 
-const STEPS: DiscoverStep[] = ['intro', 'photos', 'preferences', 'lifestyle', 'complete'];
+const STEPS: DiscoverStep[] = ['intro', 'basics', 'photos', 'preferences', 'lifestyle', 'complete'];
+
+// User's own gender options
+const MY_GENDER_OPTIONS = [
+    { value: 'male', label: 'Man', emoji: '👨' },
+    { value: 'female', label: 'Woman', emoji: '👩' },
+    { value: 'non-binary', label: 'Non-Binary', emoji: '🧑' },
+    { value: 'other', label: 'Other', emoji: '✨' },
+];
+
+// Height options in cm
+const HEIGHT_OPTIONS = [
+    { value: 150, label: "4'11\" (150cm)" },
+    { value: 155, label: "5'1\" (155cm)" },
+    { value: 160, label: "5'3\" (160cm)" },
+    { value: 165, label: "5'5\" (165cm)" },
+    { value: 170, label: "5'7\" (170cm)" },
+    { value: 175, label: "5'9\" (175cm)" },
+    { value: 180, label: "5'11\" (180cm)" },
+    { value: 185, label: "6'1\" (185cm)" },
+    { value: 190, label: "6'3\" (190cm)" },
+    { value: 195, label: "6'5\" (195cm)" },
+    { value: 200, label: "6'7\"+ (200cm+)" },
+];
 
 const MAX_ADDITIONAL_PHOTOS = 5;
 
@@ -85,6 +110,16 @@ export const DiscoverOnboardingScreen: React.FC = () => {
     const [uploadingPhotos, setUploadingPhotos] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current;
 
+    // Basic profile info state
+    const [age, setAge] = useState<string>('');
+    const [gender, setGender] = useState<string>('');
+    const [height, setHeight] = useState<number | null>(null);
+    const [bio, setBio] = useState<string>('');
+    const [latitude, setLatitude] = useState<number | null>(null);
+    const [longitude, setLongitude] = useState<number | null>(null);
+    const [currentCity, setCurrentCity] = useState<string>('');
+    const [locationLoading, setLocationLoading] = useState(false);
+
     // Photos state
     const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
 
@@ -120,6 +155,19 @@ export const DiscoverOnboardingScreen: React.FC = () => {
     };
 
     const handleNext = () => {
+        // Validate basics step
+        if (currentStep === 'basics') {
+            const ageNum = parseInt(age);
+            if (!age || isNaN(ageNum) || ageNum < 18 || ageNum > 100) {
+                Alert.alert('Required', 'Please enter a valid age (18-100)');
+                return;
+            }
+            if (!gender) {
+                Alert.alert('Required', 'Please select your gender');
+                return;
+            }
+        }
+
         if (stepIndex < STEPS.length - 1) {
             animateTransition('forward');
             setCurrentStep(STEPS[stepIndex + 1]);
@@ -136,6 +184,27 @@ export const DiscoverOnboardingScreen: React.FC = () => {
     const handleComplete = async () => {
         try {
             setLoading(true);
+
+            // Save basic profile data to backend (age, gender, height, bio, location)
+            const profileData: any = {
+                age: parseInt(age) || null,
+                gender,
+                height: height || null,
+                bio: bio || null,
+            };
+            if (latitude && longitude) {
+                profileData.latitude = latitude;
+                profileData.longitude = longitude;
+            }
+            if (currentCity) {
+                profileData.currentCity = currentCity;
+            }
+
+            console.log('📝 Saving profile data:', profileData);
+            const profileResult = await userApi.updateProfile(profileData);
+            if (!profileResult.success) {
+                console.warn('Failed to save profile:', profileResult.message);
+            }
 
             // Save preferences to backend
             const prefsResult = await userApi.saveDatingPreferences(preferences);
@@ -214,6 +283,45 @@ export const DiscoverOnboardingScreen: React.FC = () => {
         setAdditionalPhotos(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleGetLocation = async () => {
+        try {
+            setLocationLoading(true);
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Location permission is needed to find matches near you.');
+                return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+            setLatitude(location.coords.latitude);
+            setLongitude(location.coords.longitude);
+
+            // Try to get city name from coordinates
+            try {
+                const [address] = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                });
+                if (address?.city) {
+                    setCurrentCity(address.city);
+                } else if (address?.subregion) {
+                    setCurrentCity(address.subregion);
+                }
+            } catch (geocodeError) {
+                console.warn('Reverse geocode failed:', geocodeError);
+            }
+
+            Alert.alert('Success', 'Location updated!');
+        } catch (error) {
+            console.error('Error getting location:', error);
+            Alert.alert('Error', 'Failed to get location. You can update it later in settings.');
+        } finally {
+            setLocationLoading(false);
+        }
+    };
+
     const handleUploadPhotos = async () => {
         if (additionalPhotos.length === 0) {
             handleNext();
@@ -268,6 +376,133 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             <Text style={styles.photoTip}>
                 💡 Tip: Photos showing your hobbies and interests get more matches!
             </Text>
+
+            <View style={{ height: 100 }} />
+        </ScrollView>
+    );
+
+    const renderBasicsStep = () => (
+        <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionTitle}>Tell us about yourself</Text>
+            <Text style={styles.sectionSubtitle}>
+                This helps us show you to the right people
+            </Text>
+
+            {/* Age */}
+            <View style={styles.optionGroup}>
+                <Text style={styles.optionLabel}>📅 Your Age</Text>
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.textInput}
+                        value={age}
+                        onChangeText={(text) => {
+                            // Only allow numbers
+                            const numericText = text.replace(/[^0-9]/g, '');
+                            if (numericText === '' || (parseInt(numericText) >= 0 && parseInt(numericText) <= 100)) {
+                                setAge(numericText);
+                            }
+                        }}
+                        keyboardType="numeric"
+                        placeholder="Enter your age"
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        maxLength={2}
+                    />
+                </View>
+                <Text style={styles.inputHint}>You must be 18 or older to use this app</Text>
+            </View>
+
+            {/* Gender */}
+            <View style={styles.optionGroup}>
+                <Text style={styles.optionLabel}>👤 I am a</Text>
+                <View style={styles.optionsGrid}>
+                    {MY_GENDER_OPTIONS.map(option => (
+                        <TouchableOpacity
+                            key={option.value}
+                            style={[
+                                styles.optionChip,
+                                gender === option.value && styles.optionChipSelected,
+                            ]}
+                            onPress={() => setGender(option.value)}
+                        >
+                            <Text style={styles.optionEmoji}>{option.emoji}</Text>
+                            <Text style={[
+                                styles.optionChipText,
+                                gender === option.value && styles.optionChipTextSelected,
+                            ]}>
+                                {option.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Height */}
+            <View style={styles.optionGroup}>
+                <Text style={styles.optionLabel}>📏 Height (optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.heightScroll}>
+                    <View style={styles.optionsRow}>
+                        {HEIGHT_OPTIONS.map(option => (
+                            <TouchableOpacity
+                                key={option.value}
+                                style={[
+                                    styles.heightChip,
+                                    height === option.value && styles.heightChipSelected,
+                                ]}
+                                onPress={() => setHeight(height === option.value ? null : option.value)}
+                            >
+                                <Text style={[
+                                    styles.heightChipText,
+                                    height === option.value && styles.heightChipTextSelected,
+                                ]}>
+                                    {option.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </ScrollView>
+            </View>
+
+            {/* Bio */}
+            <View style={styles.optionGroup}>
+                <Text style={styles.optionLabel}>✍️ About me (optional)</Text>
+                <View style={styles.bioInputContainer}>
+                    <TextInput
+                        style={styles.bioInput}
+                        value={bio}
+                        onChangeText={setBio}
+                        placeholder="Write a short bio..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        multiline
+                        maxLength={300}
+                        numberOfLines={4}
+                    />
+                    <Text style={styles.charCount}>{bio.length}/300</Text>
+                </View>
+            </View>
+
+            {/* Location */}
+            <View style={styles.optionGroup}>
+                <Text style={styles.optionLabel}>📍 Location (optional)</Text>
+                <TouchableOpacity
+                    style={styles.locationButton}
+                    onPress={handleGetLocation}
+                    disabled={locationLoading}
+                >
+                    {locationLoading ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                        <>
+                            <Ionicons name="location" size={20} color="#fff" />
+                            <Text style={styles.locationButtonText}>
+                                {currentCity ? `📍 ${currentCity}` : 'Get My Location'}
+                            </Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+                {currentCity ? (
+                    <Text style={styles.locationHint}>Location will help show you nearby matches</Text>
+                ) : null}
+            </View>
 
             <View style={{ height: 100 }} />
         </ScrollView>
@@ -473,6 +708,8 @@ export const DiscoverOnboardingScreen: React.FC = () => {
         switch (currentStep) {
             case 'intro':
                 return renderIntroStep();
+            case 'basics':
+                return renderBasicsStep();
             case 'photos':
                 return renderPhotosStep();
             case 'preferences':
@@ -848,5 +1085,93 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             textAlign: 'center',
             lineHeight: 24,
             paddingHorizontal: 20,
+        },
+        // Basics Step Styles
+        inputContainer: {
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+            paddingHorizontal: 16,
+            paddingVertical: 4,
+        },
+        textInput: {
+            fontSize: 18,
+            color: '#fff',
+            paddingVertical: 14,
+            fontWeight: '500',
+        },
+        inputHint: {
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.5)',
+            marginTop: 8,
+        },
+        heightScroll: {
+            marginHorizontal: -20,
+            paddingHorizontal: 20,
+        },
+        heightChip: {
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 20,
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+            marginRight: 8,
+        },
+        heightChipSelected: {
+            backgroundColor: '#fff',
+            borderColor: '#fff',
+        },
+        heightChipText: {
+            fontSize: 13,
+            color: '#fff',
+            fontWeight: '500',
+        },
+        heightChipTextSelected: {
+            color: theme.colors.primary,
+        },
+        bioInputContainer: {
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+        },
+        bioInput: {
+            fontSize: 16,
+            color: '#fff',
+            minHeight: 100,
+            textAlignVertical: 'top',
+        },
+        charCount: {
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.5)',
+            textAlign: 'right',
+            marginTop: 8,
+        },
+        locationButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            paddingVertical: 16,
+            paddingHorizontal: 24,
+            borderRadius: 30,
+            gap: 10,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.3)',
+        },
+        locationButtonText: {
+            fontSize: 16,
+            color: '#fff',
+            fontWeight: '600',
+        },
+        locationHint: {
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.6)',
+            marginTop: 8,
+            textAlign: 'center',
         },
     });

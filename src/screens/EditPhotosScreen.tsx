@@ -48,6 +48,7 @@ export const EditPhotosScreen: React.FC = () => {
       const response = await userApi.getUserProfile();
       if (response.success && response.data?.user) {
         const userData = response.data.user;
+        console.log(userData,'yyyy')
         setProfilePhoto(userData.profilePhoto || userData.photo || null);
         
         // Load additional photos

@@ -218,7 +218,10 @@ export const EditProfileScreen: React.FC = () => {
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
             <TouchableOpacity onPress={() => navigation.navigate('EditProfilePicture')}>
-              {(profileData?.photo || user?.photo) ? (
+              
+              {
+                
+              (profileData?.photo || user?.photo) ? (
                 <Image source={{ uri: profileData?.photo || user?.photo }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
