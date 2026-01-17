@@ -86,8 +86,29 @@ export const ChatScreen: React.FC = () => {
 
         const handleHostMessage = (data: { message: ChatHostMessage; sessionId: number }) => {
             setHostMessages(prev => {
-                const exists = prev.some(m => m.id === data.message.id);
-                if (exists) return prev;
+                // Check for exact ID match
+                const existsById = prev.some(m => m.id === data.message.id);
+                if (existsById) return prev;
+                
+                // Also check for duplicate by content + sender + recent timestamp (within 5 seconds)
+                // This handles the case where sender has optimistic local message with temp ID
+                const messageTime = new Date(data.message.createdAt).getTime();
+                const existsByContent = prev.some(m => 
+                    m.content === data.message.content && 
+                    m.senderId === data.message.senderId &&
+                    Math.abs(new Date(m.createdAt).getTime() - messageTime) < 5000
+                );
+                if (existsByContent) {
+                    // Replace the temp message with the real one (has correct DB id)
+                    return prev.map(m => 
+                        m.content === data.message.content && 
+                        m.senderId === data.message.senderId &&
+                        Math.abs(new Date(m.createdAt).getTime() - messageTime) < 5000
+                            ? data.message
+                            : m
+                    );
+                }
+                
                 return [...prev, data.message];
             });
             setShowOptIn(false);
