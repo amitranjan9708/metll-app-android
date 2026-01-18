@@ -68,7 +68,7 @@ export const DateScreen: React.FC = () => {
                 const response = await userApi.getUserProfile();
                 if (response.success && response.data?.user) {
                     const userData = response.data.user;
-                    
+
                     // Load dating preferences
                     if (userData.datingPrefs) {
                         const prefs = userData.datingPrefs;
@@ -81,7 +81,7 @@ export const DateScreen: React.FC = () => {
                         setFilters(newFilters);
                         setTempFilters(newFilters);
                     }
-                    
+
                     // Load user's location
                     if (userData.latitude && userData.longitude) {
                         setUserLocation({
@@ -158,7 +158,7 @@ export const DateScreen: React.FC = () => {
     }) => {
         try {
             setLocationLoading(true);
-            
+
             // Update local state
             setUserLocation(location);
 
@@ -172,7 +172,7 @@ export const DateScreen: React.FC = () => {
             if (result.success) {
                 Alert.alert(
                     '📍 Location Updated',
-                    location.city 
+                    location.city
                         ? `Your location is set to ${location.city}. Distance filters will now work!`
                         : 'Your location has been saved. Distance filters will now work!'
                 );
@@ -203,8 +203,8 @@ export const DateScreen: React.FC = () => {
 
             if (isMatch && match) {
                 setCurrentMatch(match as MatchData);
-                        setIsMatchModalVisible(true);
-                    }
+                setIsMatchModalVisible(true);
+            }
             moveToNextProfile();
         } catch (error) {
             console.error('Like failed:', error);
@@ -254,6 +254,32 @@ export const DateScreen: React.FC = () => {
         return SITUATIONS.find(s => s.id === questionId);
     };
 
+    // Helper to format activity status
+    const getActivityStatus = (lastActiveAt?: string): { text: string; color: string } => {
+        if (!lastActiveAt) return { text: '', color: '#6B6B6B' };
+
+        const lastActive = new Date(lastActiveAt);
+        const now = new Date();
+        const diffMs = now.getTime() - lastActive.getTime();
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffMins < 5) {
+            return { text: 'Active now', color: '#10B981' };
+        } else if (diffMins < 60) {
+            return { text: `Active ${diffMins}m ago`, color: '#10B981' };
+        } else if (diffHours < 24) {
+            return { text: 'Active today', color: '#F59E0B' };
+        } else if (diffDays === 1) {
+            return { text: 'Active yesterday', color: '#6B6B6B' };
+        } else if (diffDays < 7) {
+            return { text: `Active ${diffDays}d ago`, color: '#6B6B6B' };
+        } else {
+            return { text: 'Active this week', color: '#6B6B6B' };
+        }
+    };
+
     const styles = getStyles(theme, insets);
     const currentProfile = profiles[currentIndex];
 
@@ -261,7 +287,7 @@ export const DateScreen: React.FC = () => {
         return (
             <View style={styles.container}>
                 <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                     <Text style={styles.loadingText}>Finding people near you...</Text>
                 </View>
             </View>
@@ -269,10 +295,10 @@ export const DateScreen: React.FC = () => {
     }
 
     // Check if filters are non-default
-    const hasActiveFilters = filters.ageMin !== 18 || 
-                             filters.ageMax !== 50 || 
-                             filters.distanceMax !== 50 || 
-                             filters.genderPreference !== 'all';
+    const hasActiveFilters = filters.ageMin !== 18 ||
+        filters.ageMax !== 50 ||
+        filters.distanceMax !== 50 ||
+        filters.genderPreference !== 'all';
 
     const handleResetFilters = () => {
         const defaultFilters = {
@@ -366,7 +392,7 @@ export const DateScreen: React.FC = () => {
                     <Text style={styles.filterSubLabel}>
                         Set your location to see distance to matches
                     </Text>
-                    
+
                     {userLocation.latitude && userLocation.longitude ? (
                         <View style={styles.locationStatus}>
                             <View style={styles.locationStatusContent}>
@@ -410,7 +436,7 @@ export const DateScreen: React.FC = () => {
                             )}
                         </TouchableOpacity>
                     )}
-                    
+
                     {!userLocation.latitude && (
                         <Text style={styles.locationWarning}>
                             ⚠️ Distance filter won't work without your location
@@ -559,18 +585,18 @@ export const DateScreen: React.FC = () => {
                     </View>
                     <Text style={styles.emptyTitle}>No profiles found</Text>
                     <Text style={styles.emptySubtitle}>
-                        {hasActiveFilters 
-                            ? "Try adjusting your filters to see more people" 
+                        {hasActiveFilters
+                            ? "Try adjusting your filters to see more people"
                             : "Check back later for new people near you"}
                     </Text>
-                    
+
                     {hasActiveFilters && (
                         <TouchableOpacity style={styles.resetFiltersBtn} onPress={handleResetFilters}>
                             <Ionicons name="refresh-outline" size={18} color="#fff" />
                             <Text style={styles.resetFiltersBtnText}>Reset Filters</Text>
                         </TouchableOpacity>
                     )}
-                    
+
                     <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
                         <Text style={styles.refreshBtnText}>Refresh</Text>
                     </TouchableOpacity>
@@ -662,7 +688,55 @@ export const DateScreen: React.FC = () => {
                     <TouchableOpacity style={styles.filterChip} onPress={() => setShowFilters(true)}>
                         <Text style={styles.filterChipText}>{filters.distanceMax} km</Text>
                     </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Sticky Profile Header */}
+            <View style={styles.profileHeader}>
+                <View style={styles.profileHeaderLeft}>
+                    {currentProfile.profilePhoto || getAllPhotos(currentProfile)[0] ? (
+                        <Image
+                            source={{ uri: currentProfile.profilePhoto || getAllPhotos(currentProfile)[0] }}
+                            style={styles.profileHeaderAvatar}
+                        />
+                    ) : (
+                        <View style={[styles.profileHeaderAvatar, styles.profileHeaderAvatarPlaceholder]}>
+                            <Ionicons name="person" size={20} color="#999" />
+                        </View>
+                    )}
+                    <View style={styles.profileHeaderInfo}>
+                        <View style={styles.profileHeaderNameRow}>
+                            <Text style={styles.profileHeaderName}>{currentProfile.name}</Text>
+                            {currentProfile.age && (
+                                <Text style={styles.profileHeaderAge}>, {currentProfile.age}</Text>
+                            )}
+                            {currentProfile.isVerified && (
+                                <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginLeft: 4 }} />
+                            )}
+                        </View>
+                        {(() => {
+                            const activity = getActivityStatus((currentProfile as any).lastActiveAt);
+                            return activity.text ? (
+                                <View style={styles.activityContainer}>
+                                    <View style={[styles.activityDot, { backgroundColor: activity.color }]} />
+                                    <Text style={[styles.activityText, { color: activity.color }]}>
+                                        {activity.text}
+                                    </Text>
                                 </View>
+                            ) : null;
+                        })()}
+                    </View>
+                </View>
+                {currentProfile.distance !== null && currentProfile.distance !== undefined && (
+                    <View style={styles.distanceBadge}>
+                        <Ionicons name="location-outline" size={12} color="#6B6B6B" />
+                        <Text style={styles.distanceText}>
+                            {typeof currentProfile.distance === 'number'
+                                ? `${Math.round(currentProfile.distance)} km`
+                                : currentProfile.distance}
+                        </Text>
+                    </View>
+                )}
             </View>
 
             <ScrollView
@@ -681,7 +755,7 @@ export const DateScreen: React.FC = () => {
                     if (element.type === 'photo') {
                         return (
                             <View key={`photo-${idx}`} style={styles.photoCard}>
-                            <Image
+                                <Image
                                     source={{ uri: element.url }}
                                     style={styles.profilePhoto}
                                     resizeMode="cover"
@@ -697,20 +771,8 @@ export const DateScreen: React.FC = () => {
                     }
 
                     if (element.type === 'info') {
-    return (
+                        return (
                             <View key="info" style={styles.infoCard}>
-                                <View style={styles.nameRow}>
-                                    <Text style={styles.profileName}>{currentProfile.name}</Text>
-                                    {currentProfile.age && (
-                                        <Text style={styles.profileAge}>, {currentProfile.age}</Text>
-                                    )}
-                                    {currentProfile.isVerified && (
-                                        <View style={styles.verifiedBadge}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                                        </View>
-                                    )}
-            </View>
-
                                 {currentProfile.bio && (
                                     <Text style={styles.profileBio}>{currentProfile.bio}</Text>
                                 )}
@@ -751,12 +813,12 @@ export const DateScreen: React.FC = () => {
                                 </View>
                                 <Text style={styles.promptQuestion}>{question.question}</Text>
                                 <Text style={styles.promptAnswer}>{element.data.answer}</Text>
-                    <TouchableOpacity
+                                <TouchableOpacity
                                     style={styles.promptLikeBtn}
                                     onPress={() => handleLike(`prompt-${element.index}`)}
-                    >
+                                >
                                     <Ionicons name="heart-outline" size={22} color="#1A1A1A" />
-                    </TouchableOpacity>
+                                </TouchableOpacity>
                             </View>
                         );
                     }
@@ -772,12 +834,12 @@ export const DateScreen: React.FC = () => {
             <View style={styles.actionContainer}>
                 <TouchableOpacity style={styles.passBtn} onPress={handlePass}>
                     <Ionicons name="close" size={28} color="#1A1A1A" />
-                    </TouchableOpacity>
+                </TouchableOpacity>
 
                 <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike()}>
                     <Ionicons name="heart" size={28} color="#fff" />
-                    </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
+            </View>
 
             <MatchModal
                 visible={isMatchModalVisible}
@@ -919,6 +981,79 @@ const getStyles = (theme: any, insets: any) => StyleSheet.create({
     },
     filterChipTextActive: {
         color: '#fff',
+    },
+    // Profile Header (sticky below filters)
+    profileHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    profileHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    profileHeaderAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        marginRight: 12,
+    },
+    profileHeaderAvatarPlaceholder: {
+        backgroundColor: '#F0F0F0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    profileHeaderInfo: {
+        flex: 1,
+    },
+    profileHeaderNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    profileHeaderName: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    profileHeaderAge: {
+        fontSize: 20,
+        fontWeight: '500',
+        color: '#1A1A1A',
+    },
+    activityContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 2,
+    },
+    activityDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginRight: 6,
+    },
+    activityText: {
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    distanceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 16,
+    },
+    distanceText: {
+        fontSize: 12,
+        color: '#6B6B6B',
+        fontWeight: '500',
     },
     scrollView: {
         flex: 1,

@@ -22,6 +22,7 @@ import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { userApi, authApi } from '../services/api';
 import { DatingPreferences } from '../types';
+import { useAppFonts, fontFamily } from '../theme/fonts';
 
 const { width } = Dimensions.get('window');
 
@@ -104,11 +105,20 @@ export const DiscoverOnboardingScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<any>();
     const { completeDiscoverOnboarding } = useAuth();
+    const fontsLoaded = useAppFonts();
 
+    const [showSplash, setShowSplash] = useState(true);
     const [currentStep, setCurrentStep] = useState<DiscoverStep>('intro');
     const [loading, setLoading] = useState(false);
     const [uploadingPhotos, setUploadingPhotos] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current;
+
+    // Splash animation refs
+    const splashOpacity = useRef(new Animated.Value(0)).current;
+    const splashScale = useRef(new Animated.Value(0.8)).current;
+    const letterAnimations = useRef(
+        ['m', 'e', 't', 'l', 'l'].map(() => new Animated.Value(0))
+    ).current;
 
     // Basic profile info state
     const [age, setAge] = useState<string>('');
@@ -135,6 +145,52 @@ export const DiscoverOnboardingScreen: React.FC = () => {
         drinking: undefined,
         children: undefined,
     });
+
+    // Run splash animation on mount - wait for fonts to load
+    useEffect(() => {
+        if (!fontsLoaded) return;
+
+        // Main entrance animation
+        Animated.parallel([
+            Animated.timing(splashOpacity, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+            Animated.spring(splashScale, {
+                toValue: 1,
+                friction: 8,
+                tension: 40,
+                useNativeDriver: true,
+            }),
+        ]).start();
+
+        // Animate letters one by one with a dramatic spring
+        const letterStagger = Animated.stagger(
+            120, // slightly slower stagger for elegance
+            letterAnimations.map(anim =>
+                Animated.spring(anim, {
+                    toValue: 1,
+                    friction: 6,
+                    tension: 35,
+                    useNativeDriver: true,
+                })
+            )
+        );
+
+        setTimeout(() => letterStagger.start(), 300);
+
+        // Hide splash after animation
+        const timer = setTimeout(() => {
+            Animated.timing(splashOpacity, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+            }).start(() => setShowSplash(false));
+        }, 3500); // Extended duration
+
+        return () => clearTimeout(timer);
+    }, [fontsLoaded]);
 
     const stepIndex = STEPS.indexOf(currentStep);
 
@@ -367,7 +423,7 @@ export const DiscoverOnboardingScreen: React.FC = () => {
 
                 {additionalPhotos.length < MAX_ADDITIONAL_PHOTOS && (
                     <TouchableOpacity style={styles.addPhotoButton} onPress={handlePickPhoto}>
-                        <Ionicons name="add" size={40} color="rgba(255,255,255,0.6)" />
+                        <Ionicons name="add" size={40} color="#AAAAAA" />
                         <Text style={styles.addPhotoText}>Add Photo</Text>
                     </TouchableOpacity>
                 )}
@@ -389,14 +445,18 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             </Text>
 
             {/* Age */}
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>📅 Your Age</Text>
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Your Age</Text>
+                </View>
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.textInput}
                         value={age}
                         onChangeText={(text) => {
-                            // Only allow numbers
                             const numericText = text.replace(/[^0-9]/g, '');
                             if (numericText === '' || (parseInt(numericText) >= 0 && parseInt(numericText) <= 100)) {
                                 setAge(numericText);
@@ -404,7 +464,7 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                         }}
                         keyboardType="numeric"
                         placeholder="Enter your age"
-                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        placeholderTextColor="#AAAAAA"
                         maxLength={2}
                     />
                 </View>
@@ -412,22 +472,26 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             </View>
 
             {/* Gender */}
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>👤 I am a</Text>
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="person-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>I am a</Text>
+                </View>
                 <View style={styles.optionsGrid}>
                     {MY_GENDER_OPTIONS.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.optionChip,
-                                gender === option.value && styles.optionChipSelected,
+                                styles.modernChip,
+                                gender === option.value && styles.modernChipSelected,
                             ]}
                             onPress={() => setGender(option.value)}
                         >
-                            <Text style={styles.optionEmoji}>{option.emoji}</Text>
                             <Text style={[
-                                styles.optionChipText,
-                                gender === option.value && styles.optionChipTextSelected,
+                                styles.modernChipText,
+                                gender === option.value && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -437,8 +501,14 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             </View>
 
             {/* Height */}
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>📏 Height (optional)</Text>
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="resize-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Height</Text>
+                    <Text style={styles.optionalBadge}>Optional</Text>
+                </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.heightScroll}>
                     <View style={styles.optionsRow}>
                         {HEIGHT_OPTIONS.map(option => (
@@ -463,45 +533,60 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             </View>
 
             {/* Bio */}
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>✍️ About me (optional)</Text>
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>About me</Text>
+                    <Text style={styles.optionalBadge}>Optional</Text>
+                </View>
                 <View style={styles.bioInputContainer}>
                     <TextInput
                         style={styles.bioInput}
                         value={bio}
                         onChangeText={setBio}
-                        placeholder="Write a short bio..."
-                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        placeholder="Write a short bio about yourself..."
+                        placeholderTextColor="#AAAAAA"
                         multiline
                         maxLength={300}
                         numberOfLines={4}
                     />
-                    <Text style={styles.charCount}>{bio.length}/300</Text>
                 </View>
+                <Text style={styles.charCount}>{bio.length}/300</Text>
             </View>
 
             {/* Location */}
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>📍 Location (optional)</Text>
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="navigate-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Location</Text>
+                    <Text style={styles.optionalBadge}>Optional</Text>
+                </View>
                 <TouchableOpacity
                     style={styles.locationButton}
                     onPress={handleGetLocation}
                     disabled={locationLoading}
                 >
                     {locationLoading ? (
-                        <ActivityIndicator color="#fff" size="small" />
+                        <ActivityIndicator color={theme.colors.primary} size="small" />
                     ) : (
                         <>
-                            <Ionicons name="location" size={20} color="#fff" />
+                            <Ionicons name="location" size={20} color={theme.colors.primary} />
                             <Text style={styles.locationButtonText}>
-                                {currentCity ? `📍 ${currentCity}` : 'Get My Location'}
+                                {currentCity ? currentCity : 'Get My Location'}
                             </Text>
+                            {!currentCity && (
+                                <Ionicons name="chevron-forward" size={18} color="#AAAAAA" />
+                            )}
                         </>
                     )}
                 </TouchableOpacity>
-                {currentCity ? (
-                    <Text style={styles.locationHint}>Location will help show you nearby matches</Text>
-                ) : null}
+                {currentCity && (
+                    <Text style={styles.locationHint}>Location helps show you nearby matches</Text>
+                )}
             </View>
 
             <View style={{ height: 100 }} />
@@ -511,7 +596,7 @@ export const DiscoverOnboardingScreen: React.FC = () => {
     const renderIntroStep = () => (
         <View style={styles.stepContent}>
             <View style={styles.introContainer}>
-                <Text style={styles.introEmoji}>🌹</Text>
+                <Text style={styles.introTitle}>MetLL</Text>
                 <Text style={styles.introTitle}>Welcome to Discover</Text>
                 <Text style={styles.introSubtitle}>
                     Let's set up your dating preferences to show you the most compatible matches
@@ -538,23 +623,29 @@ export const DiscoverOnboardingScreen: React.FC = () => {
     const renderPreferencesStep = () => (
         <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.sectionTitle}>What are you looking for?</Text>
+            <Text style={styles.sectionSubtitle}>Help us find your perfect match</Text>
 
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>Relationship Type</Text>
+            {/* Relationship Type */}
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="heart-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Relationship Type</Text>
+                </View>
                 <View style={styles.optionsGrid}>
                     {RELATIONSHIP_TYPES.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.optionChip,
-                                preferences.relationshipType === option.value && styles.optionChipSelected,
+                                styles.modernChip,
+                                preferences.relationshipType === option.value && styles.modernChipSelected,
                             ]}
                             onPress={() => setPreferences(p => ({ ...p, relationshipType: option.value as any }))}
                         >
-                            <Text style={styles.optionEmoji}>{option.emoji}</Text>
                             <Text style={[
-                                styles.optionChipText,
-                                preferences.relationshipType === option.value && styles.optionChipTextSelected,
+                                styles.modernChipText,
+                                preferences.relationshipType === option.value && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -563,22 +654,27 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                 </View>
             </View>
 
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>Dating Intention</Text>
+            {/* Dating Intention */}
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="sparkles-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Dating Intention</Text>
+                </View>
                 <View style={styles.optionsGrid}>
                     {DATING_INTENTIONS.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.optionChip,
-                                preferences.datingIntention === option.value && styles.optionChipSelected,
+                                styles.modernChip,
+                                preferences.datingIntention === option.value && styles.modernChipSelected,
                             ]}
                             onPress={() => setPreferences(p => ({ ...p, datingIntention: option.value as any }))}
                         >
-                            <Text style={styles.optionEmoji}>{option.emoji}</Text>
                             <Text style={[
-                                styles.optionChipText,
-                                preferences.datingIntention === option.value && styles.optionChipTextSelected,
+                                styles.modernChipText,
+                                preferences.datingIntention === option.value && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -587,21 +683,27 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                 </View>
             </View>
 
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>Show me</Text>
-                <View style={styles.optionsRow}>
+            {/* Show Me */}
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="people-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Show me</Text>
+                </View>
+                <View style={styles.optionsGrid}>
                     {GENDER_OPTIONS.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.genderChip,
-                                preferences.genderPreference?.includes(option.value) && styles.genderChipSelected,
+                                styles.modernChip,
+                                preferences.genderPreference?.includes(option.value) && styles.modernChipSelected,
                             ]}
                             onPress={() => toggleGenderPreference(option.value)}
                         >
                             <Text style={[
-                                styles.genderChipText,
-                                preferences.genderPreference?.includes(option.value) && styles.genderChipTextSelected,
+                                styles.modernChipText,
+                                preferences.genderPreference?.includes(option.value) && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -619,21 +721,28 @@ export const DiscoverOnboardingScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>A bit about your lifestyle</Text>
             <Text style={styles.sectionSubtitle}>These are optional but help find better matches</Text>
 
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>🚬 Smoking</Text>
-                <View style={styles.optionsRow}>
+            {/* Smoking */}
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="cloud-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Smoking</Text>
+                    <Text style={styles.optionalBadge}>Optional</Text>
+                </View>
+                <View style={styles.optionsGrid}>
                     {LIFESTYLE_OPTIONS.smoking.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.lifestyleChip,
-                                preferences.smoking === option.value && styles.lifestyleChipSelected,
+                                styles.modernChip,
+                                preferences.smoking === option.value && styles.modernChipSelected,
                             ]}
                             onPress={() => setPreferences(p => ({ ...p, smoking: option.value }))}
                         >
                             <Text style={[
-                                styles.lifestyleChipText,
-                                preferences.smoking === option.value && styles.lifestyleChipTextSelected,
+                                styles.modernChipText,
+                                preferences.smoking === option.value && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -642,21 +751,28 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                 </View>
             </View>
 
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>🍷 Drinking</Text>
-                <View style={styles.optionsRow}>
+            {/* Drinking */}
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="wine-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Drinking</Text>
+                    <Text style={styles.optionalBadge}>Optional</Text>
+                </View>
+                <View style={styles.optionsGrid}>
                     {LIFESTYLE_OPTIONS.drinking.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.lifestyleChip,
-                                preferences.drinking === option.value && styles.lifestyleChipSelected,
+                                styles.modernChip,
+                                preferences.drinking === option.value && styles.modernChipSelected,
                             ]}
                             onPress={() => setPreferences(p => ({ ...p, drinking: option.value }))}
                         >
                             <Text style={[
-                                styles.lifestyleChipText,
-                                preferences.drinking === option.value && styles.lifestyleChipTextSelected,
+                                styles.modernChipText,
+                                preferences.drinking === option.value && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -665,21 +781,28 @@ export const DiscoverOnboardingScreen: React.FC = () => {
                 </View>
             </View>
 
-            <View style={styles.optionGroup}>
-                <Text style={styles.optionLabel}>👶 Children</Text>
-                <View style={styles.optionsRow}>
+            {/* Children */}
+            <View style={styles.basicsCard}>
+                <View style={styles.basicsCardHeader}>
+                    <View style={styles.basicsIconContainer}>
+                        <Ionicons name="happy-outline" size={20} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.basicsCardTitle}>Children</Text>
+                    <Text style={styles.optionalBadge}>Optional</Text>
+                </View>
+                <View style={styles.optionsGrid}>
                     {LIFESTYLE_OPTIONS.children.map(option => (
                         <TouchableOpacity
                             key={option.value}
                             style={[
-                                styles.lifestyleChip,
-                                preferences.children === option.value && styles.lifestyleChipSelected,
+                                styles.modernChip,
+                                preferences.children === option.value && styles.modernChipSelected,
                             ]}
                             onPress={() => setPreferences(p => ({ ...p, children: option.value }))}
                         >
                             <Text style={[
-                                styles.lifestyleChipText,
-                                preferences.children === option.value && styles.lifestyleChipTextSelected,
+                                styles.modernChipText,
+                                preferences.children === option.value && styles.modernChipTextSelected,
                             ]}>
                                 {option.label}
                             </Text>
@@ -725,90 +848,136 @@ export const DiscoverOnboardingScreen: React.FC = () => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            <LinearGradient
-                colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-            />
+            {/* Animated Splash Screen */}
+            {showSplash && (
+                <Animated.View
+                    style={[
+                        styles.splashContainer,
+                        {
+                            opacity: splashOpacity,
+                            transform: [{ scale: splashScale }]
+                        }
+                    ]}
+                >
+                    <View style={styles.splashLogoContainer}>
+                        {['m', 'e', 't', 'l', 'l'].map((letter, index) => (
+                            <Animated.Text
+                                key={index}
+                                style={[
+                                    styles.splashLetter,
+                                    {
+                                        opacity: letterAnimations[index],
+                                        transform: [
+                                            {
+                                                translateY: letterAnimations[index].interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [20, 0],
+                                                }),
+                                            },
+                                            {
+                                                scale: letterAnimations[index].interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [0.5, 1],
+                                                }),
+                                            },
+                                        ],
+                                    },
+                                ]}
+                            >
+                                {letter}
+                            </Animated.Text>
+                        ))}
+                    </View>
+                    <Animated.Text style={[styles.splashTagline, { opacity: splashOpacity }]}>
+                        Find your perfect match
+                    </Animated.Text>
+                </Animated.View>
+            )}
 
-            {/* Header */}
-            <View style={styles.header}>
-                {currentStep === 'intro' ? (
-                    <TouchableOpacity onPress={handleClose} style={styles.backButton}>
-                        <Ionicons name="close" size={24} color="#fff" />
-                    </TouchableOpacity>
-                ) : stepIndex > 0 && currentStep !== 'complete' ? (
-                    <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#fff" />
-                    </TouchableOpacity>
-                ) : (
-                    <View style={styles.backButton} />
-                )}
+            {/* Main Content */}
+            {!showSplash && (
+                <>
+                    {/* Clean white background - no gradient */}
 
-                <View style={styles.progressContainer}>
-                    {STEPS.map((_, index) => (
-                        <View
-                            key={index}
-                            style={[
-                                styles.progressDot,
-                                index <= stepIndex && styles.progressDotActive,
-                            ]}
-                        />
-                    ))}
-                </View>
-
-                <View style={styles.skipButton} />
-            </View>
-
-            {/* Content */}
-            <Animated.View
-                style={[styles.content, { transform: [{ translateX: slideAnim }] }]}
-            >
-                {renderStep()}
-            </Animated.View>
-
-            {/* Footer */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                {currentStep === 'complete' ? (
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={handleComplete}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
+                    {/* Header */}
+                    <View style={styles.header}>
+                        {currentStep === 'intro' ? (
+                            <TouchableOpacity onPress={handleClose} style={styles.backButton}>
+                                <Ionicons name="close" size={24} color="#1A1A1A" />
+                            </TouchableOpacity>
+                        ) : stepIndex > 0 && currentStep !== 'complete' ? (
+                            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                                <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
+                            </TouchableOpacity>
                         ) : (
-                            <Text style={styles.primaryButtonText}>Start Discovering</Text>
+                            <View style={styles.backButton} />
                         )}
-                    </TouchableOpacity>
-                ) : currentStep === 'photos' ? (
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={handleUploadPhotos}
-                        disabled={uploadingPhotos}
+
+                        <View style={styles.progressContainer}>
+                            {STEPS.map((_, index) => (
+                                <View
+                                    key={index}
+                                    style={[
+                                        styles.progressDot,
+                                        index <= stepIndex && styles.progressDotActive,
+                                    ]}
+                                />
+                            ))}
+                        </View>
+
+                        <View style={styles.skipButton} />
+                    </View>
+
+                    {/* Content */}
+                    <Animated.View
+                        style={[styles.content, { transform: [{ translateX: slideAnim }] }]}
                     >
-                        {uploadingPhotos ? (
-                            <ActivityIndicator color="#fff" />
+                        {renderStep()}
+                    </Animated.View>
+
+                    {/* Footer */}
+                    <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+                        {currentStep === 'complete' ? (
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={handleComplete}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.primaryButtonText}>Start Discovering</Text>
+                                )}
+                            </TouchableOpacity>
+                        ) : currentStep === 'photos' ? (
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={handleUploadPhotos}
+                                disabled={uploadingPhotos}
+                            >
+                                {uploadingPhotos ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <>
+                                        <Text style={styles.primaryButtonText}>
+                                            {additionalPhotos.length > 0 ? 'Upload & Continue' : 'Skip for Now'}
+                                        </Text>
+                                        <Ionicons name="arrow-forward" size={20} color="#fff" />
+                                    </>
+                                )}
+                            </TouchableOpacity>
                         ) : (
-                            <>
+                            <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
                                 <Text style={styles.primaryButtonText}>
-                                    {additionalPhotos.length > 0 ? 'Upload & Continue' : 'Skip for Now'}
+                                    {currentStep === 'intro' ? "Let's Go" : 'Continue'}
                                 </Text>
                                 <Ionicons name="arrow-forward" size={20} color="#fff" />
-                            </>
+                            </TouchableOpacity>
                         )}
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
-                        <Text style={styles.primaryButtonText}>
-                            {currentStep === 'intro' ? "Let's Go" : 'Continue'}
-                        </Text>
-                        <Ionicons name="arrow-forward" size={20} color="#fff" />
-                    </TouchableOpacity>
-                )}
-            </View>
-        </View>
+                    </View>
+                </>
+            )}
+        </View >
     );
 };
 
@@ -816,6 +985,33 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
     StyleSheet.create({
         container: {
             flex: 1,
+            backgroundColor: '#FAFAFA',
+        },
+        // Splash Screen Styles
+        splashContainer: {
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: '#FAFAFA',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 100,
+        },
+        splashLogoContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 16,
+        },
+        splashLetter: {
+            fontSize: 52,
+            fontWeight: '800',
+            fontFamily: 'Novaklasse-Semibold',
+            color: theme.colors.primary,
+            letterSpacing: 2,
+        },
+        splashTagline: {
+            fontSize: 16,
+            fontWeight: '500',
+            color: '#6B6B6B',
+            marginTop: 8,
         },
         header: {
             flexDirection: 'row',
@@ -844,10 +1040,10 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             width: 8,
             height: 8,
             borderRadius: 4,
-            backgroundColor: 'rgba(255,255,255,0.3)',
+            backgroundColor: 'rgba(0,0,0,0.1)',
         },
         progressDotActive: {
-            backgroundColor: '#fff',
+            backgroundColor: theme.colors.primary,
         },
         content: {
             flex: 1,
@@ -861,15 +1057,18 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             paddingTop: 16,
         },
         primaryButton: {
-            backgroundColor: 'rgba(255,255,255,0.2)',
+            backgroundColor: theme.colors.primary,
             borderRadius: 16,
             paddingVertical: 18,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 8,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.3)',
+            shadowColor: theme.colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 4,
         },
         primaryButtonText: {
             color: '#fff',
@@ -883,22 +1082,22 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             alignItems: 'center',
         },
         introEmoji: {
-            fontSize: 72,
-            marginBottom: 24,
+            fontSize: 64,
+            marginBottom: 20,
         },
         introTitle: {
-            fontSize: 32,
+            fontSize: 28,
             fontWeight: '700',
-            color: '#fff',
+            color: '#1A1A1A',
             textAlign: 'center',
             marginBottom: 12,
         },
         introSubtitle: {
             fontSize: 16,
-            color: 'rgba(255,255,255,0.8)',
+            color: '#6B6B6B',
             textAlign: 'center',
             lineHeight: 24,
-            marginBottom: 48,
+            marginBottom: 40,
             paddingHorizontal: 20,
         },
         introFeatures: {
@@ -907,24 +1106,32 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
         featureRow: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 16,
+            gap: 14,
+            backgroundColor: '#fff',
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            borderRadius: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
+            elevation: 2,
         },
         featureText: {
-            fontSize: 16,
-            color: '#fff',
+            fontSize: 15,
+            color: '#1A1A1A',
             fontWeight: '500',
         },
-        // Preferences
         sectionTitle: {
-            fontSize: 28,
+            fontSize: 26,
             fontWeight: '700',
-            color: '#fff',
+            color: '#1A1A1A',
             marginBottom: 8,
             marginTop: 16,
         },
         sectionSubtitle: {
             fontSize: 14,
-            color: 'rgba(255,255,255,0.7)',
+            color: '#6B6B6B',
             marginBottom: 24,
         },
         // Photos
@@ -957,21 +1164,21 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             width: (width - 64) / 3,
             height: (width - 64) / 3 * 1.3,
             borderRadius: 12,
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            backgroundColor: '#fff',
             borderWidth: 2,
-            borderColor: 'rgba(255,255,255,0.3)',
+            borderColor: 'rgba(0,0,0,0.08)',
             borderStyle: 'dashed',
             justifyContent: 'center',
             alignItems: 'center',
         },
         addPhotoText: {
-            color: 'rgba(255,255,255,0.6)',
+            color: '#6B6B6B',
             fontSize: 12,
             marginTop: 4,
         },
         photoTip: {
             fontSize: 14,
-            color: 'rgba(255,255,255,0.8)',
+            color: '#6B6B6B',
             textAlign: 'center',
             marginTop: 24,
             paddingHorizontal: 20,
@@ -979,10 +1186,71 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
         optionGroup: {
             marginBottom: 32,
         },
-        optionLabel: {
+        // Basics Step Card Styles
+        basicsCard: {
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
+            elevation: 2,
+        },
+        basicsCardHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 16,
+        },
+        basicsIconContainer: {
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            backgroundColor: `${theme.colors.primary}15`,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 12,
+        },
+        basicsCardTitle: {
             fontSize: 16,
             fontWeight: '600',
+            color: '#1A1A1A',
+            flex: 1,
+        },
+        optionalBadge: {
+            fontSize: 11,
+            fontWeight: '500',
+            color: '#AAAAAA',
+            backgroundColor: '#F5F5F5',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 6,
+        },
+        // Modern Chips (for gender selection)
+        modernChip: {
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 12,
+            backgroundColor: '#F5F5F5',
+            marginRight: 10,
+            marginBottom: 10,
+        },
+        modernChipSelected: {
+            backgroundColor: theme.colors.primary,
+        },
+        modernChipText: {
+            fontSize: 14,
+            fontWeight: '500',
+            color: '#1A1A1A',
+        },
+        modernChipTextSelected: {
             color: '#fff',
+        },
+        optionLabel: {
+            fontSize: 15,
+            fontWeight: '600',
+            color: '#1A1A1A',
             marginBottom: 12,
         },
         optionsGrid: {
@@ -998,69 +1266,69 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
         optionChip: {
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            backgroundColor: '#fff',
             paddingHorizontal: 16,
             paddingVertical: 12,
-            borderRadius: 24,
+            borderRadius: 12,
             gap: 8,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.2)',
+            borderColor: 'rgba(0,0,0,0.08)',
         },
         optionChipSelected: {
-            backgroundColor: '#fff',
-            borderColor: '#fff',
+            backgroundColor: theme.colors.primary,
+            borderColor: theme.colors.primary,
         },
         optionEmoji: {
             fontSize: 18,
         },
         optionChipText: {
             fontSize: 14,
-            color: '#fff',
+            color: '#1A1A1A',
             fontWeight: '500',
         },
         optionChipTextSelected: {
-            color: theme.colors.primary,
+            color: '#fff',
         },
         genderChip: {
             paddingHorizontal: 20,
             paddingVertical: 12,
-            borderRadius: 24,
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: 12,
+            backgroundColor: '#fff',
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.2)',
+            borderColor: 'rgba(0,0,0,0.08)',
         },
         genderChipSelected: {
-            backgroundColor: '#fff',
-            borderColor: '#fff',
+            backgroundColor: theme.colors.primary,
+            borderColor: theme.colors.primary,
         },
         genderChipText: {
             fontSize: 14,
-            color: '#fff',
+            color: '#1A1A1A',
             fontWeight: '500',
         },
         genderChipTextSelected: {
-            color: theme.colors.primary,
+            color: '#fff',
         },
         // Lifestyle
         lifestyleChip: {
             paddingHorizontal: 16,
             paddingVertical: 10,
-            borderRadius: 20,
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: 12,
+            backgroundColor: '#fff',
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.2)',
+            borderColor: 'rgba(0,0,0,0.08)',
         },
         lifestyleChipSelected: {
-            backgroundColor: '#fff',
-            borderColor: '#fff',
+            backgroundColor: theme.colors.primary,
+            borderColor: theme.colors.primary,
         },
         lifestyleChipText: {
             fontSize: 13,
-            color: '#fff',
+            color: '#1A1A1A',
             fontWeight: '500',
         },
         lifestyleChipTextSelected: {
-            color: theme.colors.primary,
+            color: '#fff',
         },
         // Complete
         completeContainer: {
@@ -1069,41 +1337,41 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             alignItems: 'center',
         },
         completeEmoji: {
-            fontSize: 72,
-            marginBottom: 24,
+            fontSize: 64,
+            marginBottom: 20,
         },
         completeTitle: {
-            fontSize: 32,
+            fontSize: 28,
             fontWeight: '700',
-            color: '#fff',
+            color: '#1A1A1A',
             textAlign: 'center',
             marginBottom: 12,
         },
         completeSubtitle: {
             fontSize: 16,
-            color: 'rgba(255,255,255,0.8)',
+            color: '#6B6B6B',
             textAlign: 'center',
             lineHeight: 24,
             paddingHorizontal: 20,
         },
         // Basics Step Styles
         inputContainer: {
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            backgroundColor: '#fff',
             borderRadius: 16,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.2)',
+            borderColor: 'rgba(0,0,0,0.08)',
             paddingHorizontal: 16,
             paddingVertical: 4,
         },
         textInput: {
             fontSize: 18,
-            color: '#fff',
+            color: '#1A1A1A',
             paddingVertical: 14,
             fontWeight: '500',
         },
         inputHint: {
             fontSize: 12,
-            color: 'rgba(255,255,255,0.5)',
+            color: '#6B6B6B',
             marginTop: 8,
         },
         heightScroll: {
@@ -1113,41 +1381,41 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
         heightChip: {
             paddingHorizontal: 14,
             paddingVertical: 10,
-            borderRadius: 20,
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: 12,
+            backgroundColor: '#fff',
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.2)',
+            borderColor: 'rgba(0,0,0,0.08)',
             marginRight: 8,
         },
         heightChipSelected: {
-            backgroundColor: '#fff',
-            borderColor: '#fff',
+            backgroundColor: theme.colors.primary,
+            borderColor: theme.colors.primary,
         },
         heightChipText: {
             fontSize: 13,
-            color: '#fff',
+            color: '#1A1A1A',
             fontWeight: '500',
         },
         heightChipTextSelected: {
-            color: theme.colors.primary,
+            color: '#fff',
         },
         bioInputContainer: {
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            backgroundColor: '#fff',
             borderRadius: 16,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.2)',
+            borderColor: 'rgba(0,0,0,0.08)',
             paddingHorizontal: 16,
             paddingVertical: 12,
         },
         bioInput: {
             fontSize: 16,
-            color: '#fff',
+            color: '#1A1A1A',
             minHeight: 100,
             textAlignVertical: 'top',
         },
         charCount: {
             fontSize: 12,
-            color: 'rgba(255,255,255,0.5)',
+            color: '#6B6B6B',
             textAlign: 'right',
             marginTop: 8,
         },
@@ -1155,22 +1423,27 @@ const getStyles = (theme: ReturnType<typeof useTheme>) =>
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(255,255,255,0.2)',
+            backgroundColor: '#fff',
             paddingVertical: 16,
             paddingHorizontal: 24,
-            borderRadius: 30,
+            borderRadius: 16,
             gap: 10,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.3)',
+            borderColor: 'rgba(0,0,0,0.08)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
+            elevation: 2,
         },
         locationButtonText: {
             fontSize: 16,
-            color: '#fff',
+            color: '#1A1A1A',
             fontWeight: '600',
         },
         locationHint: {
             fontSize: 12,
-            color: 'rgba(255,255,255,0.6)',
+            color: '#6B6B6B',
             marginTop: 8,
             textAlign: 'center',
         },

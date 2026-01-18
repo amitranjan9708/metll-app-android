@@ -228,6 +228,7 @@ export interface Profile {
   longitude?: number;
   distance?: string;
   situationResponses?: SituationResponse[];
+  lastActiveAt?: string;
 }
 
 export interface MatchedUser {

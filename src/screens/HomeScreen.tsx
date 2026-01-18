@@ -18,35 +18,49 @@ import { Input } from '../components/Input';
 import { theme } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAppFonts, fontFamily } from '../theme/fonts';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 type ConfessionType = 'school' | 'college' | 'office' | 'home';
 
+// Character images
+const CHARACTER_IMAGES = {
+  school: require('../../assets/school_boy.png'),
+  college: require('../../assets/college_girl.png'),
+  office: require('../../assets/office_man.png'),
+  home: require('../../assets/school_boy.png'),
+};
+
 const CONFESSION_CARDS = [
   {
-    type: 'college' as const,
-    icon: 'school-outline',
-    title: 'College',
-    subtitle: 'Campus connections',
-  },
-  {
     type: 'school' as const,
-    icon: 'book-outline',
     title: 'School',
     subtitle: 'Classmate crushes',
+    position: 'left',
+    gradientColor: '#00C6FF', // Vibrant Electric Blue
+  },
+  {
+    type: 'college' as const,
+    title: 'College',
+    subtitle: 'Campus connections',
+    position: 'right',
+    gradientColor: '#FF6B6B', // Vibrant Coral Pink
   },
   {
     type: 'office' as const,
-    icon: 'briefcase-outline',
     title: 'Office',
     subtitle: 'Workplace sparks',
+    position: 'left',
+    gradientColor: '#00B09B', // Vibrant Teal
   },
   {
     type: 'home' as const,
-    icon: 'location-outline',
     title: 'Nearby',
     subtitle: 'Local connections',
+    position: 'right',
+    gradientColor: '#FF9F43', // Vibrant Orange
   },
 ];
 
@@ -54,6 +68,7 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const fontsLoaded = useAppFonts();
   const [confessionType, setConfessionType] = useState<ConfessionType | null>(null);
   const [showCrushDetails, setShowCrushDetails] = useState(false);
   const [showMatchingPhotos, setShowMatchingPhotos] = useState(false);
@@ -264,7 +279,13 @@ export const HomeScreen: React.FC = () => {
         <ScrollView style={styles.flex} contentContainerStyle={styles.formScrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.formTypeIndicator}>
             <View style={styles.formTypeIcon}>
-              <Ionicons name={currentCard?.icon as any} size={24} color="#1A1A1A" />
+              {confessionType && (
+                <Image
+                  source={CHARACTER_IMAGES[confessionType]}
+                  style={{ width: 36, height: 36 }}
+                  resizeMode="contain"
+                />
+              )}
             </View>
             <Text style={styles.formTypeText}>{currentCard?.title} Crush</Text>
           </View>
@@ -283,27 +304,30 @@ export const HomeScreen: React.FC = () => {
     );
   }
 
-  // Main home screen - Hinge-inspired minimal design
+  // Main home screen - Premium minimal design
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.mainHeader, { paddingTop: insets.top + 16 }]}>
-        <View>
+      {/* Premium Header */}
+      <View style={[styles.mainHeader, { paddingTop: insets.top + 20 }]}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.brandName}>metll</Text>
           <Text style={styles.greeting}>Hey, {user?.name?.split(' ')[0]} 👋</Text>
-          <Text style={styles.subGreeting}>Who's on your mind?</Text>
         </View>
         <TouchableOpacity
           style={styles.profileBtn}
           onPress={() => navigation.navigate('Settings' as never)}
         >
           {user?.photo ? (
-            <Image 
-              source={{ uri: user.photo }} 
+            <Image
+              source={{ uri: user.photo }}
               style={styles.profileImage}
             />
           ) : (
-            <Ionicons name="person-circle-outline" size={32} color="#1A1A1A" />
+            <View style={styles.profilePlaceholder}>
+              <Ionicons name="person" size={20} color="#6B6B6B" />
+            </View>
           )}
+          <View style={styles.profileRing} />
         </TouchableOpacity>
       </View>
 
@@ -312,38 +336,89 @@ export const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.mainScrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Confession Cards */}
-        <Text style={styles.sectionTitle}>Make a confession</Text>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.heroTitle}>Who's on your mind?</Text>
+          <Text style={styles.heroSubtitle}>Make an anonymous confession</Text>
+        </View>
 
-        {CONFESSION_CARDS.map((card, index) => (
-          <Animated.View
-            key={card.type}
-            style={{
-              opacity: cardAnims[index],
-              transform: [{
-                translateY: cardAnims[index].interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [20, 0]
-                })
-              }],
-            }}
-          >
-            <TouchableOpacity
-              style={styles.confessionCard}
-              onPress={() => handleConfessionTypeSelect(card.type)}
-              activeOpacity={0.7}
+        {/* Character Confession Cards */}
+        <View style={styles.characterCardContainer}>
+          {CONFESSION_CARDS.map((card, index) => (
+            <Animated.View
+              key={card.type}
+              style={{
+                opacity: cardAnims[index],
+                transform: [{
+                  translateY: cardAnims[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30, 0]
+                  })
+                }],
+              }}
             >
-              <View style={styles.cardIcon}>
-                <Ionicons name={card.icon as any} size={24} color="#1A1A1A" />
+              {/* Gradient Banner Background */}
+              {/* Alternating Solid Background */}
+              <View
+                style={[
+                  styles.gradientBanner,
+                  { backgroundColor: index % 2 === 0 ? '#FFDC5B' : '#FFFFFF' }
+                ]}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.characterCard,
+                    card.position === 'right' && styles.characterCardReverse,
+                  ]}
+                  onPress={() => handleConfessionTypeSelect(card.type)}
+                  activeOpacity={0.9}
+                >
+                  {/* Character Image */}
+                  <View style={styles.characterImageContainer}>
+                    <Image
+                      source={CHARACTER_IMAGES[card.type]}
+                      style={styles.characterImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  {/* Text Content with Decorative Lines */}
+                  <View style={styles.characterTextContainer}>
+                    {/* Top Decorative Line with Fade */}
+                    <View style={styles.decorativeLineContainer}>
+                      <View style={styles.fadeStart} />
+                      <View style={styles.decorativeLine} />
+                      <View style={styles.fadeEnd} />
+                    </View>
+
+                    {/* Title and Subtitle */}
+                    <View style={styles.characterTextContent}>
+                      <Text style={styles.characterCardTitle}>{card.title}</Text>
+                      <Text style={styles.characterCardSubtitle}>{card.subtitle}</Text>
+                    </View>
+
+                    {/* Bottom Decorative Line with Fade */}
+                    <View style={styles.decorativeLineContainer}>
+                      <View style={styles.fadeStart} />
+                      <View style={styles.decorativeLine} />
+                      <View style={styles.fadeEnd} />
+                    </View>
+                  </View>
+
+                  {/* Modern Arrow Indicator */}
+                  <View style={styles.arrowContainer}>
+                    <View style={[
+                      styles.arrowCircle,
+                      { backgroundColor: index % 2 === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.05)' }
+                    ]}>
+                      <Ionicons name={card.position === 'right' ? "arrow-back" : "arrow-forward"} size={20} color="#1A1A1A" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
               </View>
-              <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>{card.title}</Text>
-                <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={22} color="#9B9B9B" />
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
+            </Animated.View>
+          ))}
+        </View>
 
         {/* Live Feature Card - Modern Gradient Design */}
         <TouchableOpacity
@@ -419,47 +494,169 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
 
-  // Header
+  // Premium Header
   mainHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingBottom: 20,
     backgroundColor: '#FAFAFA',
   },
+  headerLeft: {
+    flex: 1,
+  },
+  brandName: {
+    fontSize: 32,
+    fontWeight: '800',
+    fontFamily: 'Novaklasse-Semibold',
+    color: theme.colors.primary,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
   greeting: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B6B6B',
+  },
+  profileBtn: {
+    position: 'relative',
+    padding: 4,
+  },
+  profileImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  profilePlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileRing: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    right: 2,
+    bottom: 2,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: theme.colors.primary + '30',
+  },
+
+  // Main content - Removed horizontal padding for full bleed banners
+  mainScrollContent: {
+    padding: 0,
+    paddingTop: 0,
+  },
+
+  // Hero Section - Added padding since main container is full bleed
+  heroSection: {
+    marginBottom: 28,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  heroTitle: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1A1A1A',
     letterSpacing: -0.5,
+    marginBottom: 6,
   },
-  subGreeting: {
-    fontSize: 15,
+  heroSubtitle: {
+    fontSize: 16,
     color: '#6B6B6B',
-    marginTop: 4,
-  },
-  profileBtn: {
-    padding: 4,
-  },
-  profileImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
   },
 
-  // Main content
-  mainScrollContent: {
-    padding: 24,
-    paddingTop: 8,
+  // Character Confession Cards - No Box, Floating
+  characterCardContainer: {
+    gap: 0, // Removed gap between banners
+    marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#9B9B9B',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 16,
+  gradientBanner: {
+    // No radius or overflow hidden for full width
+    width: '100%',
+  },
+  characterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12, // Reduced from 24 to give more space
+  },
+  characterCardReverse: {
+    flexDirection: 'row-reverse',
+  },
+  characterImageContainer: {
+    width: 130,
+    height: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  characterImage: {
+    width: 130,
+    height: 160,
+  },
+  characterTextContainer: {
+    flex: 1,
+    paddingHorizontal: 8, // Reduced from 16
+    justifyContent: 'center',
+    height: 100,
+  },
+  arrowContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  arrowCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  decorativeLineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 1.5,
+  },
+  fadeStart: {
+    width: 24,
+    height: 1.5,
+    backgroundColor: '#1A1A1A',
+    opacity: 0.08,
+    borderRadius: 1,
+  },
+  decorativeLine: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: '#1A1A1A',
+    opacity: 0.2,
+    marginHorizontal: 2,
+    borderRadius: 1,
+  },
+  fadeEnd: {
+    width: 24,
+    height: 1.5,
+    backgroundColor: '#1A1A1A',
+    opacity: 0.08,
+    borderRadius: 1,
+  },
+  characterTextContent: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  characterCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  characterCardSubtitle: {
+    fontSize: 14,
+    color: '#6B6B6B',
   },
 
   // Confession cards - minimal list style
@@ -502,6 +699,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 24,
     marginTop: 28,
+    marginHorizontal: 24, // Added horizontal margin
     minHeight: 160,
   },
   liveGradientBase: {
